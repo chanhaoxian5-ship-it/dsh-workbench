@@ -11,8 +11,8 @@ SUPPORTED = ("2025-06-18", "2025-03-26", "2024-11-05")
 LIMIT = 262144
 
 
-def serve(data_dir, source, sink):
-    service = AgentService(data_dir)
+def serve(data_dir, source, sink, project_dir=None):
+    service = AgentService(data_dir, project_dir)
     initialized = False
     while True:
         line = source.readline(LIMIT + 1)
@@ -43,7 +43,7 @@ def serve(data_dir, source, sink):
                     version = params.get("protocolVersion")
                     result = {"protocolVersion": version if version in SUPPORTED else SUPPORTED[0],
                               "capabilities": {"tools": {}},
-                              "serverInfo": {"name": "dsh-workbench", "version": "0.2.0"},
+                              "serverInfo": {"name": "dsh-workbench", "version": "0.3.0"},
                               "instructions": "Use source-grounded v1 payloads, preserve keys on retries, read back receipts. Service lifecycle is controlled in DSH Settings."}
                     initialized = True
                 elif method == "ping":
@@ -74,6 +74,7 @@ def serve(data_dir, source, sink):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--data-dir", type=Path, required=True)
+    parser.add_argument("--project-dir", type=Path, help="Registered project directory with .workbench/project.json; no management-token fallback")
     parser.add_argument("--call", help="Run one shared Agent tool, reading its arguments from stdin")
     args = parser.parse_args()
     if args.call:
@@ -82,10 +83,10 @@ def main():
             arguments = parse_json(raw) if len(raw) <= LIMIT else None
         except (ValueError, UnicodeError):
             arguments = None
-        output = safe_call(AgentService(args.data_dir), args.call, arguments)
+        output = safe_call(AgentService(args.data_dir, args.project_dir), args.call, arguments)
         sys.stdout.write(json.dumps(output, ensure_ascii=False) + "\n")
     else:
-        serve(args.data_dir, sys.stdin.buffer, sys.stdout.buffer)
+        serve(args.data_dir, sys.stdin.buffer, sys.stdout.buffer, args.project_dir)
     return 0
 
 

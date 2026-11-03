@@ -4,7 +4,7 @@
 
 先检查`dsh --version`和`python --version`。当前宿主API验证范围是0.2.1-rc.5；其他版本先做兼容验证，不豁免版本检查。
 
-把私有仓库clone到一个稳定的本地目录。已验证的DSH命令形态是：
+把公开仓库clone到一个稳定的本地目录。已验证的DSH命令形态是：
 
 ```powershell
 dsh plugin --profile desktop link '<本插件目录的绝对路径>'
@@ -49,14 +49,14 @@ dataDir必须是绝对路径。preferredPort=0表示插件自行在49152–65535
 
 ## 4. 其他Agent的MCP
 
-点击设置页「显示 MCP 配置」，复制生成的配置到目标Agent允许的MCP配置位置。不同客户端可能只接受其中的server对象；以该客户端的格式为准。
+先从设置页打开工作台，在网页顶部“项目访问权限”选择已登记项目，生成并写入该项目连接配置。再回设置页填写该项目绝对目录，点击「显示此项目的 MCP 配置」，复制到目标Agent允许的MCP配置位置。不同客户端可能只接受其中的server对象；以该客户端的格式为准。
 
 ```json
 {
   "mcpServers": {
     "workbench": {
       "command": "python",
-      "args": ["C:/path/to/dsh-workbench/scripts/mcp.py", "--data-dir", "C:/Users/you/.dsh/storages/workbench"]
+      "args": ["C:/path/to/dsh-workbench/scripts/mcp.py", "--data-dir", "C:/Users/you/.dsh/storages/workbench", "--project-dir", "D:/Projects/你的项目"]
     }
   }
 }
@@ -64,10 +64,10 @@ dataDir必须是绝对路径。preferredPort=0表示插件自行在49152–65535
 
 所有路径换成实际绝对路径；必要时command用Python解释器完整路径。stdio不需要URL、端口或令牌。每次工具调用读取endpoint并验证实例，后端重启换端口无需改MCP配置。MCP进程退出不会关闭共享后端。
 
-MCP权限相当于访问该用户授权的工作台数据，模型不会获得永久令牌。只给需要读写这些项目的Agent配置，先按AGENT_GUIDE确定项目和来源范围。
+MCP 只使用该项目凭证，按只读/读写权限访问一个工作区；项目配置不含秘密。Windows 下本机秘密由当前用户 DPAPI 加密。DSH 工具每次传 project_dir；未配置不会读取全局管理 Token。完整期限、撤销、目录与接口见[登录与项目凭证](api/项目凭证与浏览器登录.md)。
 
 ## 5. 更新与卸载
 
-先停止旧后端，再替换/更新插件源码并重载DSH；确认启动的是新版本。数据保留在独立目录，不被build、升级或插件卸载清除。
+0.3.0 启用持久浏览器登录与项目凭证。先停止旧后端，再替换/更新插件源码并重载DSH；确认启动的是新版本。旧 MCP 配置要新增 --project-dir，并先由用户签发项目连接配置。旧项目记录无需迁移；新建 auth.sqlite3 与 credentials，保留现有管理令牌供宿主控制使用。数据保留在独立目录，不被build、升级或插件卸载清除。
 
 回退时停止新后端、恢复原profile配置或移除该插件条目，按原方式启动旧服务。保留操作前数据库一致备份；不自动把新写入倒灌旧库。移除插件与删除用户数据是不同动作，本包没有删除资料库的按钮。

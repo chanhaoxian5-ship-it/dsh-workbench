@@ -3,6 +3,7 @@ import argparse
 import json
 import os
 import secrets
+import sqlite3
 import threading
 import time
 import uuid
@@ -12,6 +13,7 @@ from pathlib import Path
 from .contracts import Problem
 from .server import ASSETS, MAX_BODY, Handler, Server, parse_json
 from .store import Store
+from .auth_http import session_cookie
 
 
 @contextmanager
@@ -65,7 +67,11 @@ class ManagedHandler(Handler):
             self.guard(preflight=connect)
             if self.path == "/v1/runtime" and self.command == "GET":
                 self.server.store.list(limit=1)
-                self.send_json(200, dict(self.server.runtime, status="running"))
+                result = dict(self.server.runtime, status="running", service_id=self.server.auth.service_id)
+                if self.principal["kind"] == "project":
+                    result["workspace_id"] = self.principal["workspace_id"]
+                    result.pop("pid", None)
+                self.send_json(200, result)
                 return
             if self.command != "POST":
                 raise Problem("not_found", "Unsupported runtime operation", 404)
@@ -77,7 +83,9 @@ class ManagedHandler(Handler):
                     expiry = self.server.tickets.pop(value["ticket"], 0)
                 if expiry < time.monotonic():
                     raise Problem("invalid_ticket", "Invalid or expired browser ticket", 401)
-                self.send_json(200, {"token": self.server.token})
+                token, _ = self.server.auth.issue("session")
+                session_cookie(self, token)
+                self.send_json(200, {"schema_version": 1, "connected": True})
                 return
             if value != {"instance_id": self.server.runtime["instance_id"]}:
                 raise Problem("instance_mismatch", "Reload service status first", 409)
@@ -96,6 +104,8 @@ class ManagedHandler(Handler):
             self.send_json(error.status, {"error": {"code": error.code, "message": error.message, "retryable": error.retryable}})
         except (ValueError, UnicodeError):
             self.send_json(400, {"error": {"code": "invalid_json", "retryable": False}})
+        except sqlite3.Error:
+            self.send_json(503, {"schema_version": 1, "error": {"code": "storage_unavailable", "retryable": True}})
         except OSError:
             self.close_connection = True
 
@@ -128,7 +138,7 @@ def run(data, preferred_port=0):
         server.RequestHandlerClass = ManagedHandler
         ASSETS["/launch.js"] = ("launch.js", "text/javascript; charset=utf-8")
         server.runtime = {"schema_version": 1, "instance_id": uuid.uuid4().hex, "pid": os.getpid(),
-                          "api_base": f"http://127.0.0.1:{server.server_port}", "version": "0.2.0"}
+                          "api_base": f"http://127.0.0.1:{server.server_port}", "version": "0.3.0"}
         server.tickets, server.ticket_lock = {}, threading.Lock()
         endpoint = data / "endpoint.json"
         try:

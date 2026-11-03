@@ -12,10 +12,13 @@ from urllib.parse import parse_qs, urlsplit
 from .contracts import MAX_BODY, Problem, identity
 from .store import Store
 from . import project_http
+from .auth import AuthStore, authorize
+from . import auth_http
 
 ROOT = Path(__file__).resolve().parents[2]
 WEB_ROOT = Path(__file__).resolve().parent / "web"
 ASSETS = {"/": ("index.html", "text/html; charset=utf-8"),
+          "/auth-ui.js": ("auth-ui.js", "text/javascript; charset=utf-8"),
           "/app.js": ("app.js", "text/javascript; charset=utf-8"),
           "/app.css": ("app.css", "text/css; charset=utf-8"),
           "/motion.css": ("motion.css", "text/css; charset=utf-8"),
@@ -64,6 +67,7 @@ class Server(ThreadingHTTPServer):
                 raise ValueError("allowed-origin must be an exact local http origin, without a trailing slash")
             _ = parts.port  # Reject malformed port numbers.
         self.store, self.token, self.allowed_origin = store, token, allowed_origin
+        self.auth = AuthStore(store.path.parent)
         super().__init__(address, Handler)
 
 
@@ -85,6 +89,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store")
         self.send_header("X-Content-Type-Options", "nosniff")
         self.send_header("Connection", "close")
+        if getattr(self, "auth_cookie", None):
+            self.send_header("Set-Cookie", self.auth_cookie)
         if self.headers.get("Origin") == self.server.allowed_origin and self.server.allowed_origin:
             self.send_header("Access-Control-Allow-Origin", self.server.allowed_origin)
             self.send_header("Vary", "Origin")
@@ -111,8 +117,21 @@ class Handler(BaseHTTPRequestHandler):
         own_origin = "http://" + self.headers.get("Host", "")
         if origin and origin not in (own_origin, self.server.allowed_origin):
             raise Problem("origin_denied", "Origin is not allowed", 403)
-        if not preflight and not hmac.compare_digest(self.headers.get("Authorization", "").encode("utf-8"), ("Bearer " + self.server.token).encode("ascii")):
-            raise Problem("unauthorized", "Bearer token required", 401)
+        if not preflight:
+            authorization = self.headers.get("Authorization", "")
+            if hmac.compare_digest(authorization.encode("utf-8"), ("Bearer " + self.server.token).encode("ascii")):
+                self.principal = {"kind": "master"}
+            elif authorization:
+                if not authorization.startswith("Bearer ") or len(authorization) > 512:
+                    raise Problem("unauthorized", "Invalid bearer credential", 401)
+                self.principal = self.server.auth.authenticate(authorization[7:], "project")
+            else:
+                # Custom header blocks cross-origin simple requests and form posts.
+                if self.headers.get("X-Workbench-Request") != "1":
+                    raise Problem("unauthorized", "Workbench connection required", 401)
+                self.principal = self.server.auth.authenticate(auth_http.cookie_token(self), "session", touch=False)
+            url = urlsplit(self.path)
+            authorize(self.principal, self.command, url.path, parse_qs(url.query, keep_blank_values=True), self.server.store.projects)
 
     def do_OPTIONS(self):
         self.handle_request()
@@ -126,6 +145,8 @@ class Handler(BaseHTTPRequestHandler):
     def handle_request(self):
         try:
             url = urlsplit(self.path)
+            if auth_http.dispatch(self, url):
+                return
             if self.command == "GET" and url.path in ASSETS and (not url.query or (url.path == "/" and url.query == "preview=1")):
                 self.guard(preflight=True)  # Public shell only; every data request still requires a token.
                 filename, content_type = ASSETS[url.path]
@@ -175,6 +196,7 @@ class Handler(BaseHTTPRequestHandler):
                         raise Problem("invalid_json", "Expected strict UTF-8 JSON", 400)
                     status, result = self.server.store.reject(Problem("invalid_json", "Expected UTF-8 JSON without duplicate keys or nonfinite numbers", 400))
                 else:
+                    authorize(self.principal, "POST", url.path, {}, self.server.store.projects, value)
                     if project_route:
                         status, result = project_http.dispatch(self.server.store, "POST", url.path, {}, value)
                     elif state_route:
@@ -189,8 +211,13 @@ class Handler(BaseHTTPRequestHandler):
             query = parse_qs(url.query, keep_blank_values=True)
             if any(len(v) != 1 for v in query.values()):
                 raise Problem("invalid_query", "Repeated parameters are unsupported", 400)
+            authorize(self.principal, "GET", url.path, query, self.server.store.projects)
             if project_http.owns(url.path):
                 status, result = project_http.dispatch(self.server.store, "GET", url.path, query)
+                if url.path == "/v1/capabilities":
+                    result["authorization"] = ({"scope": "project", "workspace_id": self.principal["workspace_id"],
+                                                "permissions": self.principal["permissions"], "global_discoveries": False}
+                                               if self.principal["kind"] == "project" else {"scope": "management"})
                 self.send_json(status, result)
                 return
             if url.path in ("/v1/discoveries", "/v1/home", "/v1/changes"):
@@ -242,6 +269,8 @@ class Handler(BaseHTTPRequestHandler):
             self.close_connection = True
         except (ValueError, RecursionError):
             self.send_json(400, {"schema_version": 1, "error": {"code": "invalid_request", "message": "Malformed request", "retryable": False}})
+        except OSError:
+            self.send_json(503, {"schema_version": 1, "error": {"code": "credential_storage_unavailable", "message": "Check project and service storage permissions", "retryable": True}})
 
 
 def main():

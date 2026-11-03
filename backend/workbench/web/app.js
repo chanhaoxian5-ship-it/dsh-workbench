@@ -93,7 +93,7 @@ async function api(path, signal, token = state.token, body = null) {
   signal?.addEventListener('abort', abort, { once: true });
   const timer = setTimeout(() => { timedOut = true; request.abort(); }, 12000);
   try {
-    const response = await fetch(path, { method: body === null ? 'GET' : 'POST', body: body === null ? undefined : JSON.stringify(body), headers: { Authorization: `Bearer ${token}`, ...(body === null ? {} : {'Content-Type': 'application/json'}) }, cache: 'no-store', signal: request.signal, credentials: 'omit', redirect: 'error' });
+    const response = await fetch(path, { method: body === null ? 'GET' : 'POST', body: body === null ? undefined : JSON.stringify(body), headers: { ...(token && token !== 'session' ? {Authorization: `Bearer ${token}`} : {}), 'X-Workbench-Request':'1', ...(body === null ? {} : {'Content-Type': 'application/json'}) }, cache: 'no-store', signal: request.signal, credentials: 'same-origin', redirect: 'error' });
     const result = await response.json();
     if (!response.ok) {
       const error = new Error(response.status === 401 ? '令牌无效或已更换，请重新连接。' : response.status === 404 ? '这条记录不存在，或已切换到其他数据目录。' : response.status === 503 ? '暂时无法读取数据，请稍后重试。' : `读取失败（${response.status}）：${result.error?.code || '未知错误'}`);
@@ -117,6 +117,7 @@ async function api(path, signal, token = state.token, body = null) {
 function setStatus(status) {
   state.status = status;
   const ok = status === 'connected' && !state.preview;
+  $('access-open').disabled = !ok;
   $('connection-status').classList.toggle('connected', ok);
   const label = state.preview ? '界面预览' : { connected: '本机已连接', disconnected: '未连接', error: '连接中断', loading: '正在读取' }[status];
   text('connection-label', label);
@@ -513,13 +514,16 @@ function openConnection() {
 ['connect-main', 'connection-status'].forEach((id) => $(id).addEventListener('click', openConnection));
 $('close-connect').addEventListener('click', () => closeDialog($('connect-dialog')));
 $('connect-dialog').addEventListener('close', () => { $('token').value = ''; });
-$('disconnect').addEventListener('click', () => { disconnect(); closeDialog($('connect-dialog')); toast('已断开连接，令牌已从页面清除'); });
+$('disconnect').addEventListener('click', async () => {
+  try { await api('/v1/auth/logout', null, 'session', {}); disconnect(); closeDialog($('connect-dialog')); toast('已退出，此浏览器的登录凭证已撤销'); }
+  catch (error) { text('connect-error', error.message); visible('connect-error', true); }
+});
 $('connect-form').addEventListener('submit', async (event) => {
   event.preventDefault(); visible('connect-error', false);
   const token = $('token').value.trim();
   const controller = new AbortController();
   const abort = () => controller.abort(); $('connect-dialog').addEventListener('close', abort, { once: true });
-  const result = await motion.trackSave($('connect-submit'), () => api('/v1/health', controller.signal, token), { resetAfter: 900 });
+  const result = await motion.trackSave($('connect-submit'), () => api('/v1/auth/session', controller.signal, token, {}), { resetAfter: 900 });
   if (controller.signal.aborted) return;
   if (result.ok) {
     // 成功态（已连接 + jelly + 粒子）至少要被看见一瞬，再随退场消失。
@@ -528,7 +532,7 @@ $('connect-form').addEventListener('submit', async (event) => {
       await new Promise((resolve) => setTimeout(resolve, 260));
       if (controller.signal.aborted) return;
     }
-    disconnect(); state.token = token; setStatus('connected');
+    disconnect(); state.token = 'session'; setStatus('connected');
     changeView('home');
     closeDialog($('connect-dialog'));
     toast('已连接本机工作台', 'success');
@@ -894,3 +898,17 @@ $('see-all').addEventListener('click', () => changeView('all'));
 document.querySelectorAll('.mobile-nav [data-view]').forEach(b => b.addEventListener('click', () => changeView(b.dataset.view)));
 setStatus('disconnected'); renderList(); experience.render('home');
 if (new URLSearchParams(location.search).get('preview') === '1') setPreview(true);
+function resumeConnection() {
+  if (state.preview) return;
+  state.token = 'session'; setStatus('connected');
+  if ($('connect-dialog').open) closeDialog($('connect-dialog'));
+  changeView('home');
+}
+window.addEventListener('workbench:connected', resumeConnection);
+if (!state.preview) api('/v1/auth/session', null, 'session').then(resumeConnection).catch(() => {});
+// Only visible, trusted user gestures renew idle time; polling does not.
+let lastActivity = 0;
+for (const name of ['pointerdown','keydown','wheel']) document.addEventListener(name, event => {
+  if (!event.isTrusted || state.preview || state.token !== 'session' || document.visibilityState !== 'visible' || Date.now()-lastActivity < 60000) return;
+  lastActivity = Date.now(); api('/v1/auth/activity', null, 'session', {}).catch(() => {});
+}, {passive:true});

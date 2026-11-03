@@ -1,6 +1,6 @@
 {
   "name": "@chanhaoxian5/dsh-workbench",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "private": true,
   "description": "本地 Agent 工作台：管理项目资料、版本与工作记录，内置前后端、设置启停和 MCP 接入。",
   "icon": "./assets/icon.png",

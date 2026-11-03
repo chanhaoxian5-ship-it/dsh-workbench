@@ -1,22 +1,31 @@
 [
   {
     "name": "workbench_service_status",
-    "description": "Read actual backend health and instance identity. Does not start or stop the service.",
+    "description": "Read actual backend health and instance identity. Does not start or stop the service. Uses only this project's credential; never falls back to management access.",
     "inputSchema": {
       "type": "object",
-      "properties": {},
+      "properties": {
+        "project_dir": {
+          "type": "string",
+          "description": "Absolute registered project directory containing .workbench/project.json. Required unless MCP was started with --project-dir."
+        }
+      },
       "additionalProperties": false
     }
   },
   {
     "name": "workbench_read",
-    "description": "GET a documented local /v1 read route, including workspace/board/history/search/receipts. No arbitrary URLs or lifecycle operations.",
+    "description": "GET a documented local /v1 read route, including workspace/board/history/search/receipts. No arbitrary URLs or lifecycle operations. Uses only this project's credential; never falls back to management access.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "path": {
           "type": "string",
           "maxLength": 4096
+        },
+        "project_dir": {
+          "type": "string",
+          "description": "Absolute registered project directory containing .workbench/project.json. Required unless MCP was started with --project-dir."
         }
       },
       "required": [
@@ -27,7 +36,7 @@
   },
   {
     "name": "workbench_publish_project",
-    "description": "Reliably register/update workspace, artifact, stage, version, feedback, plan, task, record or canvas; verify receipt and exact revision. Pass the unchanged v1 envelope. refresh snapshots selected source files. This is one operation, not an atomic batch.",
+    "description": "Reliably register/update workspace, artifact, stage, version, feedback, plan, task, record or canvas; verify receipt and exact revision. Pass the unchanged v1 envelope. refresh snapshots selected source files. This is one operation, not an atomic batch. Uses only this project's credential; never falls back to management access.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -51,6 +60,10 @@
         },
         "payload": {
           "type": "object"
+        },
+        "project_dir": {
+          "type": "string",
+          "description": "Absolute registered project directory containing .workbench/project.json. Required unless MCP was started with --project-dir."
         }
       },
       "required": [
@@ -62,12 +75,16 @@
   },
   {
     "name": "workbench_publish_discovery",
-    "description": "Reliably publish a source-grounded discovery with producer/session identity, unchanged delivery key and verification declarations. Verify durable receipt and discovery readback.",
+    "description": "Legacy global discovery publishing. Unavailable to project credentials (403); use project records/artifacts instead.",
     "inputSchema": {
       "type": "object",
       "properties": {
         "payload": {
           "type": "object"
+        },
+        "project_dir": {
+          "type": "string",
+          "description": "Absolute registered project directory containing .workbench/project.json. Required unless MCP was started with --project-dir."
         }
       },
       "required": [

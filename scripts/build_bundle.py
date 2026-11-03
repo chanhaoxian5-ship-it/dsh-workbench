@@ -38,7 +38,7 @@ from workbench.agent import TOOLS
 if candidate.is_dir():
     api = SUITE / 'docs/api'
     api.mkdir(parents=True, exist_ok=True)
-    for name in ['后端V0接口与运行.md', '项目模块V1接口与运行.md', '阶段与里程碑V1接口与运行.md', '重要变化V0接口与运行.md']:
+    for name in ['后端V0接口与运行.md', '项目模块V1接口与运行.md', '阶段与里程碑V1接口与运行.md', '重要变化V0接口与运行.md', '项目凭证与浏览器登录.md']:
         text = (SUITE.parents[1] / 'docs/api' / name).read_text(encoding='utf-8')
         text = re.sub(r'\[([^\]]+)\]\(([^)]+)\)', lambda m: m[1]+'（原工程历史记录）'
                       if m[2].startswith('../') or m[2]=='前端V0使用与验证.md' else m[0], text)
@@ -61,7 +61,7 @@ for file in files:
         normalized = raw.replace(b'\r\n', b'\n').rstrip(b'\n') + b'\n'
         if normalized != raw:
             file.write_bytes(normalized)
-manifest = {'version': '0.2.0', 'backend_schema': 3, 'http_schema': 1,
+manifest = {'version': '0.3.0', 'backend_schema': 3, 'http_schema': 1,
             'files': {p.relative_to(SUITE).as_posix(): hashlib.sha256(p.read_bytes()).hexdigest() for p in sorted(files)}}
 (SUITE / 'bundle-manifest.json').write_text(json.dumps(manifest, indent=2)+'\n', encoding='utf-8')
 print(f'Bundled {len(files)} source files; no runtime data copied.')

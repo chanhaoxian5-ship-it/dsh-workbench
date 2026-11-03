@@ -168,10 +168,14 @@ class Projects:
             return {"id": workspace_id, "kind": "workspace", "version": version}, False
         return self._operation("workspace.save", workspace_id, value, save)
 
-    def list_workspaces(self, limit=30, before=None, include_test=False, status="all"):
+    def list_workspaces(self, limit=30, before=None, include_test=False, status="all", workspace_id=None):
         paging(limit, before)
         contract.choice(status, ("all", "active", "paused", "archived"), "status")
         clauses, args = [], []
+        if workspace_id is not None:
+            identity(workspace_id, "workspace_id")
+            clauses.append("workspace_id=?")
+            args.append(workspace_id)
         if not include_test:
             clauses.append("is_test=0")
         if before is not None:

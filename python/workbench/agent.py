@@ -8,6 +8,7 @@ from .contracts import MAX_BODY, Problem
 from .project_contracts import COLLECTIONS
 from .project_publish import ProjectPublisher
 from .publish import DeliveryError, Publisher
+from .auth import seal
 
 ID = r"[A-Za-z0-9][A-Za-z0-9_.:-]{0,127}"
 COLLECTION = "(?:" + "|".join(COLLECTIONS) + ")"
@@ -21,12 +22,27 @@ READ_PATHS = [
 
 
 class AgentService:
-    def __init__(self, data_dir):
+    def __init__(self, data_dir, project_dir=None):
         self.data = Path(data_dir).resolve()
+        self.project = Path(project_dir).resolve() if project_dir else None
 
     def client(self):
+        if self.project is None:
+            raise DeliveryError("project_configuration_required", False)
         try:
-            raw = (self.data / "endpoint.json").read_bytes()
+            config_path = self.project / ".workbench" / "project.json"
+            if config_path.stat().st_size > 8192:
+                raise ValueError()
+            config = json.loads(config_path.read_text(encoding="utf-8"))
+            key = config["credential_id"]
+            if (config.get("schema_version") != 1 or not re.fullmatch(r"[a-f0-9]{32}", key)
+                    or not re.fullmatch(r"[a-f0-9]{32}", config["service_id"])):
+                raise ValueError()
+            data = Path(config["data_dir"])
+            if not data.is_absolute():
+                raise ValueError()
+            data = data.resolve()
+            raw = (data / "endpoint.json").read_bytes()
             if len(raw) > 4096:
                 raise ValueError()
             endpoint = json.loads(raw)
@@ -36,10 +52,18 @@ class AgentService:
             if not re.fullmatch(r"[a-f0-9]{32}", endpoint["instance_id"]):
                 raise ValueError()
             port = urlsplit(base).port
-            token = (self.data / "api-token.txt").read_text(encoding="ascii").strip()
+            secret = data / "credentials" / (key + ".secret")
+            if secret.stat().st_size > 8192:
+                raise ValueError()
+            token = seal(secret.read_bytes(), decrypt=True).decode("ascii")
             client = ProjectPublisher(port, token, attempts=3, timeout=5)
             runtime = client.request("GET", "/v1/runtime")
             if runtime.get("instance_id") != endpoint["instance_id"] or runtime.get("api_base") != base:
+                raise ValueError()
+            if runtime.get("service_id") != config["service_id"] or runtime.get("workspace_id") != config["workspace_id"]:
+                raise ValueError()
+            workspace = client.request("GET", "/v1/workspaces/" + quote(config["workspace_id"], safe=""))
+            if Path(workspace["root_path"]).resolve() != self.project:
                 raise ValueError()
             return client, runtime
         except (OSError, ValueError, KeyError, TypeError):
@@ -48,6 +72,14 @@ class AgentService:
     def call(self, name, arguments):
         if not isinstance(arguments, dict):
             raise ValueError("arguments must be an object")
+        arguments = dict(arguments)
+        project = arguments.pop("project_dir", None)
+        if project is not None:
+            if not isinstance(project, str) or not Path(project).is_absolute():
+                raise ValueError("absolute project_dir required")
+            if self.project is not None and Path(project).resolve() != self.project:
+                raise DeliveryError("forbidden", False)
+            return AgentService(self.data, project).call(name, arguments)
         fields = {
             "workbench_service_status": (),
             "workbench_read": ("path",),
@@ -60,8 +92,9 @@ class AgentService:
             try:
                 _, runtime = self.client()
                 return runtime
-            except DeliveryError:
-                return {"status": "stopped_or_unavailable", "action": "Start the backend from DSH Settings > Workbench."}
+            except DeliveryError as error:
+                return {"status": "project_configuration_required" if error.code == "project_configuration_required" else "stopped_or_unavailable",
+                        "action": "Generate project access in Workbench, configure project_dir, and start the backend from DSH Settings."}
         # Validate a read target before reading credentials or making a request.
         if name == "workbench_read":
             path = arguments.get("path")
@@ -107,3 +140,7 @@ TOOLS = [
     {"name": "workbench_publish_discovery", "description": "Reliably publish a source-grounded discovery with producer/session identity, unchanged delivery key and verification declarations. Verify durable receipt and discovery readback.",
      "inputSchema": {"type": "object", "properties": {"payload": {"type": "object"}}, "required": ["payload"], "additionalProperties": False}},
 ]
+for tool in TOOLS:
+    tool["inputSchema"]["properties"]["project_dir"] = {"type": "string", "description": "Absolute registered project directory containing .workbench/project.json. Required unless MCP was started with --project-dir."}
+    tool["description"] += " Uses only this project's credential; never falls back to management access."
+TOOLS[-1]["description"] = "Legacy global discovery publishing. Unavailable to project credentials (403); use project records/artifacts instead."

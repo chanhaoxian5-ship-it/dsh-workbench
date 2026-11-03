@@ -50,7 +50,7 @@ def dispatch(store, method, path, query, value=None):
         return 200, projects.list_items(**params)
     if path == "/v1/workspaces":
         if method == "GET":
-            return 200, projects.list_workspaces(**parameters(query, ("limit", "before", "include_test", "status")))
+            return 200, projects.list_workspaces(**parameters(query, ("limit", "before", "include_test", "status", "workspace_id")))
         if method == "POST":
             parameters(query, ())
             return projects.save_workspace(value)

@@ -10,3 +10,8 @@ experiments/
 **/*.log
 node_modules/
 .git/
+
+# Per-project connection references and local encrypted Agent secrets.
+**/credentials/
+**/*.secret
+**/.workbench/

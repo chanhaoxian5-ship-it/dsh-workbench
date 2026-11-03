@@ -15,28 +15,39 @@ async function fixture(t,config={}){
 }
 async function post(url,body,token){return fetch(url,{method:'POST',headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{})},body:JSON.stringify(body)});}
 
+async function owner(controller,route,body){
+  const status=await controller.status();
+  const token=(await fs.readFile(path.join(controller.dataDir,'api-token.txt'),'utf8')).trim();
+  const response=await post(status.api_base+route,body,token);
+  const value=await response.json();assert.ok(response.ok,JSON.stringify(value));return value;
+}
+async function configure(controller,root){
+  const project=path.join(root,'project');await fs.mkdir(project,{recursive:true});await fs.writeFile(path.join(project,'PLAN.md'),'Synthetic fixture.');
+  const request={schema_version:1,operation_key:'register-test',expected_version:0,workspace:{id:'test-space',name:'Synthetic workspace',root_path:project,kind:'project',view:'paper',status:'active',favorite:false,description:'Isolated test',is_test:true}};
+  await owner(controller,'/v1/workspaces',request);
+  await owner(controller,'/v1/auth/projects',{workspace_id:'test-space',label:'Test Agent',permissions:'write'});
+  return project;
+}
+
 test('concurrent managers share one owned high-port service; restart persists data',async t=>{
   const {root,controller}=await fixture(t);
   const second=new Controller({dataDir:controller.dataDir});
   const [a,b]=await Promise.all([controller.start(),second.start()]);
   assert.equal(a.instance_id,b.instance_id);assert.equal(a.pid,b.pid);
   assert.ok(Number(new URL(a.api_base).port)>=49152);
-  const project=path.join(root,'project');await fs.mkdir(project);await fs.writeFile(path.join(project,'PLAN.md'),'Synthetic fixture.');
+  const project=await configure(controller,root);
+  const tool=(name,args)=>controller.tool(name,{...args,project_dir:project});
   const envelope=(key,item)=>({schema_version:1,operation_key:key,expected_version:0,item});
-  const request={schema_version:1,operation_key:'register-test',expected_version:0,workspace:{id:'test-space',name:'Synthetic workspace',root_path:project,kind:'project',view:'paper',status:'active',favorite:false,description:'Isolated test',is_test:true}};
-  const saved=await controller.tool('workbench_publish_project',{collection:'workspaces',payload:request});
-  assert.equal(saved.ok,true);assert.equal(saved.result.readback_confirmed,true);
-  assert.equal((await controller.tool('workbench_publish_project',{collection:'workspaces',payload:request})).result.receipt_id,saved.result.receipt_id);
   const artifact=envelope('file-test',{id:'file-test',kind:'artifact',title:'Plan',archived:false,data:{relative_path:'PLAN.md',category:'document',description:'Synthetic source',expected_sha256:null}});
-  assert.equal((await controller.tool('workbench_publish_project',{collection:'artifacts',workspace_id:'test-space',payload:artifact})).ok,true);
+  assert.equal((await tool('workbench_publish_project',{collection:'artifacts',workspace_id:'test-space',payload:artifact})).ok,true);
   const stage=envelope('stage-test',{id:'stage-test',kind:'stage',title:'Prepare',archived:false,data:{status:'unknown',date:null,summary:'Synthetic',refs:[{id:'file-test',kind:'artifact',role:'source',version:1}]}});
-  assert.equal((await controller.tool('workbench_publish_project',{collection:'stages',workspace_id:'test-space',payload:stage})).ok,true);
+  assert.equal((await tool('workbench_publish_project',{collection:'stages',workspace_id:'test-space',payload:stage})).ok,true);
   const after=await controller.restart();assert.notEqual(after.instance_id,a.instance_id);
-  const read=await controller.tool('workbench_read',{path:'/v1/workspaces/test-space/stages/stage-test?version=1'});
+  const read=await tool('workbench_read',{path:'/v1/workspaces/test-space/stages/stage-test?version=1'});
   assert.equal(read.result.id,'stage-test');
-  assert.equal((await controller.tool('workbench_read',{path:'/v1/search?q=中文&include_test=true'})).ok,true);
+  assert.equal((await tool('workbench_read',{path:'/v1/search?q=中文&include_test=true'})).ok,true);
   const token=(await fs.readFile(path.join(controller.dataDir,'api-token.txt'),'utf8')).trim();
-  assert.ok(!JSON.stringify(after).includes(token));assert.ok(!JSON.stringify(controller.mcpConfig()).includes(token));
+  assert.ok(!JSON.stringify(after).includes(token));assert.ok(!JSON.stringify(controller.mcpConfig(project)).includes(token));
 });
 
 test('occupied preferred port falls back to another high port without touching its listener',async t=>{
@@ -54,7 +65,7 @@ test('browser ticket is single use; shutdown requires authentication and instanc
   const permanent=(await fs.readFile(path.join(controller.dataDir,'api-token.txt'),'utf8')).trim();
   assert.ok(!url.includes(permanent));assert.equal(new URL(url).search,'');
   const ticket=new URLSearchParams(new URL(url).hash.slice(1)).get('launch');
-  let response=await post(status.api_base+'/v1/runtime/connect',{ticket});assert.equal(response.status,200);assert.equal((await response.json()).token,permanent);
+  let response=await post(status.api_base+'/v1/runtime/connect',{ticket});assert.equal(response.status,200);assert.equal((await response.json()).connected,true);assert.ok(response.headers.get('set-cookie').includes('HttpOnly'));
   response=await post(status.api_base+'/v1/runtime/connect',{ticket});assert.equal(response.status,401);
   response=await post(status.api_base+'/v1/runtime/stop',{instance_id:status.instance_id});assert.equal(response.status,401);
   response=await post(status.api_base+'/v1/runtime/stop',{instance_id:'wrong'},permanent);assert.equal(response.status,409);
@@ -73,7 +84,7 @@ test('a mismatched endpoint identity cannot be stopped',async t=>{
 });
 
 test('stdio MCP handshake, tools, offline status and URL rejection',async t=>{
-  const {controller}=await fixture(t);
+  const {root,controller}=await fixture(t);
   const child=spawn(controller.pythonPath,[path.join(packageRoot,'scripts/mcp.py'),'--data-dir',controller.dataDir],{windowsHide:true,stdio:['pipe','pipe','pipe']});
   t.after(()=>child.kill());
   let buffer='',id=0;const pending=new Map();let stderr='';child.stderr.on('data',b=>stderr+=b);
@@ -83,12 +94,33 @@ test('stdio MCP handshake, tools, offline status and URL rejection',async t=>{
   assert.equal(response.result.protocolVersion,'2024-11-05');
   child.stdin.write(JSON.stringify({jsonrpc:'2.0',method:'notifications/initialized'})+'\n');
   response=await call('tools/list');assert.equal(response.result.tools.length,4);
-  response=await call('tools/call',{name:'workbench_service_status',arguments:{}});assert.equal(JSON.parse(response.result.content[0].text).result.status,'stopped_or_unavailable');
+  response=await call('tools/call',{name:'workbench_service_status',arguments:{}});assert.equal(JSON.parse(response.result.content[0].text).result.status,'project_configuration_required');
   assert.equal((await controller.status()).status,'stopped');
   response=await call('tools/call',{name:'workbench_read',arguments:{path:'http://example.invalid/'}});assert.equal(response.result.isError,true);
   const first=await controller.start();
-  response=await call('tools/call',{name:'workbench_read',arguments:{path:'/v1/capabilities'}});assert.equal(JSON.parse(response.result.content[0].text).result.database_version,3);
+  const project=await configure(controller,root);
+  response=await call('tools/call',{name:'workbench_read',arguments:{path:'/v1/capabilities',project_dir:project}});assert.equal(JSON.parse(response.result.content[0].text).result.database_version,3);
   const restarted=await controller.restart();assert.notEqual(first.instance_id,restarted.instance_id);
-  response=await call('tools/call',{name:'workbench_service_status',arguments:{}});assert.equal(JSON.parse(response.result.content[0].text).result.instance_id,restarted.instance_id);
+  response=await call('tools/call',{name:'workbench_service_status',arguments:{project_dir:project}});assert.equal(JSON.parse(response.result.content[0].text).result.instance_id,restarted.instance_id);
   assert.equal(stderr,'');child.stdin.end();
+});
+
+test('project MCP stays pinned; copied configs and revoked credentials cannot regain access',async t=>{
+  const {root,controller}=await fixture(t);await controller.start();
+  const project=await configure(controller,root);
+  const copied=path.join(root,'copied-project');await fs.mkdir(path.join(copied,'.workbench'),{recursive:true});
+  await fs.copyFile(path.join(project,'.workbench','project.json'),path.join(copied,'.workbench','project.json'));
+  assert.equal((await controller.tool('workbench_read',{path:'/v1/capabilities',project_dir:copied})).ok,false);
+  const single=async args=>{
+    const child=spawn(controller.pythonPath,[path.join(packageRoot,'scripts/mcp.py'),'--data-dir',controller.dataDir,'--project-dir',project,'--call','workbench_read'],{windowsHide:true,stdio:['pipe','pipe','pipe']});
+    let raw='';child.stdout.on('data',b=>raw+=b);child.stdin.end(JSON.stringify(args));
+    await new Promise((resolve,reject)=>{child.on('error',reject);child.on('close',code=>code===0?resolve():reject(Error('MCP call failed')));});
+    return JSON.parse(raw);
+  };
+  assert.equal((await single({path:'/v1/capabilities'})).ok,true);
+  assert.equal((await single({path:'/v1/capabilities',project_dir:copied})).error.code,'forbidden');
+  const config=JSON.parse(await fs.readFile(path.join(project,'.workbench','project.json'),'utf8'));
+  await owner(controller,'/v1/auth/revoke',{credential_id:config.credential_id});
+  assert.equal((await single({path:'/v1/capabilities'})).ok,false);
+  assert.equal((await controller.tool('workbench_read',{path:'/v1/capabilities'})).error.code,'project_configuration_required');
 });
