@@ -1,3 +1,5 @@
+# Install one stable Workbench plugin entry; private runtime config stays in the profile.
+# The package's dsh.client declaration supplies the matching Settings-page client.
 - insert:
     - id: workbench-suite
       name: '@chanhaoxian5/dsh-workbench'
