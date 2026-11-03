@@ -1,11 +1,14 @@
+# Local Python/Node caches and generated installation archives.
 __pycache__/
 *.pyc
 node_modules/
 *.tgz
 .test-output/
+# Isolated test runs and runtime state must never enter the source repository.
 experiments/
 data/
 outbox/
+# Local credentials, instance discovery, database files and transient output.
 api-token.txt
 endpoint.json
 *.sqlite3*
