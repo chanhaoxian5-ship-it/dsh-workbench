@@ -53,7 +53,7 @@ if candidate.is_dir():
     for name in ['publish-project.ps1', 'publish-discovery.ps1', 'maintain-backend.ps1', 'test-backend.ps1']:
         text = (SUITE.parents[1] / 'scripts' / name).read_text(encoding='utf-8').replace("'src'", "'backend'")
         (SUITE / 'scripts' / name).write_text(text, encoding='utf-8')
-files = [p for folder in ('backend', 'python', 'lib') for p in (SUITE / folder).rglob('*')
+files = [p for folder in ('backend', 'python', 'lib', 'assets', 'locale') for p in (SUITE / folder).rglob('*')
          if p.is_file() and '__pycache__' not in p.parts and p.suffix != '.pyc']
 for file in files:
     if file.suffix in ('.py', '.js', '.mjs', '.svg', '.html', '.css', '.json', '.md'):
