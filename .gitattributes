@@ -1,1 +1,2 @@
+# Normalize text to LF so Windows checkouts and CI can reproduce bundle hashes.
 * text=auto eol=lf
