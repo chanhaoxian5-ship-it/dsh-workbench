@@ -1,7 +1,9 @@
+# Supplement package.json.files with exclusions for local generated state.
 **/__pycache__/
 **/*.pyc
 experiments/
 .test-output/
+# Runtime data and authentication are not distributable package resources.
 **/*.sqlite3*
 **/api-token.txt
 **/endpoint.json
