@@ -1,0 +1,179 @@
+{
+  "workspaces": {
+    "schema_version": 1,
+    "operation_key": "register-1",
+    "expected_version": 0,
+    "workspace": {
+      "id": "project-1",
+      "name": "隔离测试项目",
+      "root_path": "D:\\YourProject",
+      "kind": "project",
+      "view": "paper",
+      "status": "active",
+      "favorite": false,
+      "description": "合成测试，不代表真实项目",
+      "is_test": true
+    }
+  },
+  "artifacts": {
+    "schema_version": 1,
+    "operation_key": "save-artifact-1",
+    "expected_version": 0,
+    "item": {
+      "id": "artifact-1",
+      "kind": "artifact",
+      "title": "合成记录 artifact-1",
+      "archived": false,
+      "data": {
+        "relative_path": "PLAN.md",
+        "category": "document",
+        "description": "来源引用",
+        "expected_sha256": null
+      }
+    }
+  },
+  "versions": {
+    "schema_version": 1,
+    "operation_key": "save-version-1",
+    "expected_version": 0,
+    "item": {
+      "id": "version-1",
+      "kind": "version",
+      "title": "合成记录 version-1",
+      "archived": false,
+      "data": {
+        "label": "version-1",
+        "status": "draft",
+        "summary": "合成整稿版本",
+        "refs": [
+          {
+            "id": "artifact-1",
+            "kind": "artifact",
+            "role": "artifact"
+          }
+        ]
+      }
+    }
+  },
+  "feedback": {
+    "schema_version": 1,
+    "operation_key": "save-feedback-1",
+    "expected_version": 0,
+    "item": {
+      "id": "feedback-1",
+      "kind": "feedback",
+      "title": "合成记录 feedback-1",
+      "archived": false,
+      "data": {
+        "quote": "请核对证据。",
+        "response": "补充位置与依据。",
+        "status": "addressed",
+        "location": "第2节",
+        "refs": [
+          {
+            "id": "version-1",
+            "kind": "version",
+            "role": "version"
+          },
+          {
+            "id": "artifact-1",
+            "kind": "artifact",
+            "role": "evidence"
+          }
+        ]
+      }
+    }
+  },
+  "plans": {
+    "schema_version": 1,
+    "operation_key": "save-plan-1",
+    "expected_version": 0,
+    "item": {
+      "id": "plan-1",
+      "kind": "plan",
+      "title": "合成记录 plan-1",
+      "archived": false,
+      "data": {
+        "summary": "来源仍为已有计划文件",
+        "stage": "准备",
+        "next_step": "检查依据",
+        "refs": [
+          {
+            "id": "artifact-1",
+            "kind": "artifact",
+            "role": "source"
+          }
+        ],
+        "change_ids": []
+      }
+    }
+  },
+  "tasks": {
+    "schema_version": 1,
+    "operation_key": "save-task-1",
+    "expected_version": 0,
+    "item": {
+      "id": "task-1",
+      "kind": "task",
+      "title": "合成记录 task-1",
+      "archived": false,
+      "data": {
+        "summary": "合成任务",
+        "status": "todo",
+        "due_date": "2026-11-01",
+        "refs": [
+          {
+            "id": "plan-1",
+            "kind": "plan",
+            "role": "plan"
+          }
+        ]
+      }
+    }
+  },
+  "records": {
+    "schema_version": 1,
+    "operation_key": "save-record-1",
+    "expected_version": 0,
+    "item": {
+      "id": "record-1",
+      "kind": "record",
+      "title": "合成记录 record-1",
+      "archived": false,
+      "data": {
+        "summary": "本次进展摘要",
+        "stage": "准备",
+        "next_step": "核对来源",
+        "blockers": [],
+        "refs": [],
+        "session": null
+      }
+    }
+  },
+  "canvases": {
+    "schema_version": 1,
+    "operation_key": "save-canvas-1",
+    "expected_version": 0,
+    "item": {
+      "id": "canvas-1",
+      "kind": "canvas",
+      "title": "合成记录 canvas-1",
+      "archived": false,
+      "data": {
+        "zoom": 1,
+        "layer": "explore",
+        "nodes": [],
+        "edges": []
+      }
+    }
+  },
+  "refresh": {
+    "schema_version": 1,
+    "operation_key": "refresh-1",
+    "expected_version": 1,
+    "filenames": [
+      "README.md",
+      "PLAN.md"
+    ]
+  }
+}

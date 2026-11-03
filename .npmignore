@@ -1,0 +1,10 @@
+**/__pycache__/
+**/*.pyc
+experiments/
+.test-output/
+**/*.sqlite3*
+**/api-token.txt
+**/endpoint.json
+**/*.log
+node_modules/
+.git/

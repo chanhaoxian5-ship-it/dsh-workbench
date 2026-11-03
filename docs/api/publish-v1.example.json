@@ -1,0 +1,35 @@
+{
+  "schema_version": 1,
+  "delivery_key": "demo-delivery-001",
+  "discovery": {
+    "record_id": "demo-record-001",
+    "revision_of": null,
+    "title": "接口演示样本（测试数据）",
+    "excerpt": "示例摘录；此处不对应真实论文。",
+    "interpretation": "示例解释，未经人工审阅。",
+    "generated_at": "2026-10-30T12:00:00+08:00",
+    "is_test": true,
+    "source": {
+      "type": "unknown",
+      "parent_key": null,
+      "attachment_key": null,
+      "sha256": null,
+      "pdf_page": null,
+      "printed_page": null,
+      "local_path": null
+    },
+    "producer": {
+      "harness": "demo",
+      "profile": "test",
+      "working_directory": "D:\\Agent_Desktop\\Areas\\workbench",
+      "run_id": "demo-run-001",
+      "production_session_id": "demo-production-session",
+      "main_session_id": "demo-main-session",
+      "main_session_title": "测试身份；不得用于真实来源定位"
+    },
+    "verification": {
+      "mechanical": {"status": "not_checked", "scope": null, "evidence": null},
+      "semantic": {"status": "not_reviewed", "reviewed_by": null, "evidence": null}
+    }
+  }
+}

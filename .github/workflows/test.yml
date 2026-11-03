@@ -1,0 +1,20 @@
+name: test
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: python scripts/build_bundle.py
+      - run: ./scripts/test-backend.ps1
+        shell: pwsh
+      - run: node --test tests/runtime.test.mjs
+      - run: npm pack --dry-run

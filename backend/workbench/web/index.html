@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <link rel="icon" href="data:,">
+  <title>Workbench · 个人工作台</title>
+  <link rel="stylesheet" href="/motion.css">
+  <link rel="stylesheet" href="/app.css">
+  <link rel="stylesheet" href="/stages.css">
+  <script type="module" src="/app.js"></script>
+</head>
+<body class="is-offline view-home is-home">
+  <a class="skip-link" href="#main">跳至主要内容</a>
+
+  <aside class="sidebar" aria-label="工作台导航">
+    <a class="brand" href="/" aria-label="Workbench 首页"><span class="brand-mark" aria-hidden="true">W</span><span class="brand-name">Workbench</span></a>
+    <nav class="navigation" id="navigation" aria-label="视图">
+      <span class="nav-plate" aria-hidden="true"></span>
+      <button class="nav-item active" id="nav-home" aria-current="page"><span data-icon="home"></span><span class="nav-label">首页</span><span class="badge-count warm" data-count="home" data-n="0" aria-hidden="true">0</span></button>
+      <button class="nav-item" id="nav-projects"><span data-icon="folder"></span><span class="nav-label">工作空间</span></button>
+      <button class="nav-item" id="nav-all"><span data-icon="spark"></span><span class="nav-label">发现</span><span class="badge-count cool" data-count="all" data-n="0" aria-hidden="true">0</span></button>
+      <button class="nav-item" id="nav-files"><span data-icon="document"></span><span class="nav-label">资料</span></button>
+    </nav>
+    <div class="sidebar-projects"><div class="sidebar-section-title">工作空间</div><div id="project-shortcuts"></div></div>
+    <div class="sidebar-foot">
+      <button id="connection-status" class="connection-pill" aria-label="连接设置"><span class="status-dot" aria-hidden="true"></span><span id="connection-label">未连接</span></button>
+      <p class="sidebar-hint">仅本机 · 思考仍在原生 Agent 中</p>
+    </div>
+  </aside>
+
+  <div class="app-shell">
+    <div class="topbar"><button class="global-search" id="global-search"><span data-icon="search"></span><span>搜索项目、发现与文件</span><kbd>Ctrl K</kbd></button><div class="topbar-actions"><button id="preview-toggle" class="preview-toggle" aria-pressed="false">界面预览</button><button id="top-settings" class="icon-button" aria-label="连接与设置"><span data-icon="settings"></span></button></div></div>
+    <main id="main" tabindex="-1">
+      <header class="page-head">
+        <div class="page-head-main">
+          <p class="page-kicker" id="page-kicker"></p>
+          <h1 id="page-title">先连接本地工作台</h1>
+          <p class="page-subtitle" id="page-subtitle"></p>
+        </div>
+        <div class="head-actions">
+          <span id="today-date" class="date-label"></span>
+          <button id="refresh" class="button secondary" disabled hidden><span data-icon="refresh"></span>刷新</button>
+        </div>
+      </header>
+
+      <section class="connect-banner" id="connect-banner" aria-labelledby="connect-heading">
+        <div><h2 id="connect-heading">连接本地工作台</h2><p>输入访问令牌后，Agent 交付的变化和发现会出现在这里。</p></div>
+        <button id="connect-main" class="button primary">连接工作台<span data-icon="arrow"></span></button>
+      </section>
+
+      <div id="page-error" class="error-banner" role="alert" hidden></div>
+      <div class="test-banner" id="test-banner" hidden><span data-icon="flask"></span>正在显示测试数据。带“测试”标记的记录不代表真实研究发现。</div>
+
+      <div id="view-content" hidden></div>
+
+      <div class="workspace" id="discovery-workspace">
+        <section class="focus" id="focus" aria-label="等你决定的事">
+          <div class="deck" id="deck" aria-live="polite"></div>
+          <div class="deck-foot" id="deck-foot">
+            <div class="deck-dots" id="deck-dots" aria-hidden="true"></div>
+            <span class="deck-pos" id="deck-pos"></span>
+            <button class="text-button deck-shelf" id="deck-shelf" type="button" hidden></button>
+          </div>
+        </section>
+
+        <section class="discoveries" aria-labelledby="discoveries-title">
+          <div class="section-head">
+            <h2 id="discoveries-title">今日发现</h2>
+            <span class="count-badge" id="loaded-count" aria-label="已载入条数">—</span>
+            <div class="discovery-filters" id="discovery-filters" role="group" aria-label="按分类筛选"></div>
+            <label class="head-search"><span data-icon="search"></span><input id="search" type="search" placeholder="筛选已载入的发现" aria-label="筛选已载入的发现" maxlength="200"></label>
+            <button id="see-all" class="text-button see-all">查看全部<span data-icon="arrow"></span></button>
+            <details class="head-more" id="head-more">
+              <summary aria-label="更多显示选项"><span data-icon="more"></span></summary>
+              <div class="head-more-panel">
+                <label class="test-toggle"><input id="include-test" type="checkbox">显示测试数据</label>
+                <span class="sort-label"><span data-icon="sort"></span>最新接收</span>
+              </div>
+            </details>
+          </div>
+
+          <div id="discovery-list" class="discovery-list" aria-live="polite" aria-busy="false"></div>
+
+          <div class="list-footer">
+            <span id="list-summary">尚未读取发现</span>
+            <button id="load-more" class="text-button" hidden>加载更多<span data-icon="down"></span></button>
+          </div>
+          <p class="list-footnote"><span data-icon="clock"></span><span id="freshness">显式刷新以获取新发现 · 日期按上海时间</span></p>
+        </section>
+        <aside class="context-rail" id="context-rail"></aside>
+      </div>
+    </main>
+  </div>
+
+  <dialog id="connect-dialog" class="connect-dialog" aria-labelledby="connect-title"><form id="connect-form"><div class="dialog-top"><span class="dialog-symbol" data-icon="link"></span><button id="close-connect" class="icon-button" type="button" aria-label="关闭连接设置"><span data-icon="close"></span></button></div><p class="eyebrow">本地连接</p><h2 id="connect-title">连接本地工作台</h2><p class="dialog-intro">输入此服务的本地访问令牌。令牌仅保留在本页内存中，刷新或关闭页面后需重新连接。</p><label class="field-label" for="token">访问令牌</label><input id="token" class="token-input" type="password" autocomplete="off" spellcheck="false" required maxlength="512" placeholder="粘贴 api-token.txt 中的令牌"><p class="field-help">默认位置：项目目录下 <code>data/api-token.txt</code>。自定义数据目录时，使用对应目录中的令牌。</p><p id="connect-error" class="form-error" role="alert" hidden></p><div class="dialog-actions"><button id="disconnect" type="button" class="button secondary" hidden>断开连接</button><button id="connect-submit" class="button primary" type="submit" data-wb-label-pending="正在连接…" data-wb-label-success="已连接" data-wb-label-error="连接失败，点击重试"><span class="wb-save-icon" aria-hidden="true"></span><span class="wb-save-text">连接工作台</span><span data-icon="arrow"></span></button></div></form></dialog>
+  <dialog id="detail-dialog" class="detail-dialog" aria-labelledby="detail-title"><div class="detail-top"><span class="eyebrow">发现详情</span><button id="close-detail" class="icon-button" aria-label="关闭发现详情"><span data-icon="close"></span></button></div><div id="detail-content"></div></dialog>
+  <dialog id="panel-dialog" class="detail-dialog panel-dialog" aria-labelledby="panel-title"><div class="detail-top"><span class="eyebrow" id="panel-eyebrow">工作详情</span><button id="close-panel" class="icon-button" aria-label="关闭详情"><span data-icon="close"></span></button></div><div id="panel-content"></div></dialog>
+  <dialog id="workspace-dialog" class="connect-dialog" aria-labelledby="workspace-form-title"><form id="workspace-form"><div class="dialog-top"><span data-icon="folder"></span><button type="button" class="icon-button" id="close-workspace" aria-label="关闭关联工作空间"><span data-icon="close"></span></button></div><p class="eyebrow">工作空间</p><h2 id="workspace-form-title">关联已有工作目录</h2><p class="dialog-intro">保留原有文件位置，为已有工作建立一个入口。</p><label class="field-label" for="workspace-name">显示名称</label><input class="token-input" id="workspace-name" required maxlength="60" placeholder="如：毕业论文"><label class="field-label spaced" for="workspace-path">目录路径</label><input class="token-input" id="workspace-path" required maxlength="300" placeholder="D:\Projects\…"><label class="field-label spaced" for="workspace-kind">主视图</label><select class="token-input" id="workspace-kind"><option value="paper">论文版本</option><option value="plan">阶段计划</option><option value="software">软件交付</option><option value="area">长期工作</option></select><p id="workspace-form-note" class="field-help"></p><div class="dialog-actions"><button class="button primary" type="submit">添加预览入口<span data-icon="arrow"></span></button></div></form></dialog>
+  <nav class="mobile-nav" id="mobile-nav" aria-label="移动导航"><span class="tab-plate" aria-hidden="true"></span><button data-view="home" class="active"><span data-icon="home"></span><span class="tab-label">首页</span><span class="badge-count warm" data-count="home" data-n="0" aria-hidden="true">0</span></button><button data-view="projects"><span data-icon="folder"></span><span class="tab-label">工作空间</span></button><button data-view="all"><span data-icon="spark"></span><span class="tab-label">发现</span><span class="badge-count cool" data-count="all" data-n="0" aria-hidden="true">0</span></button><button data-view="files"><span data-icon="document"></span><span class="tab-label">资料</span></button></nav>
+  <div id="toast" class="toast" role="status" hidden></div>
+  <noscript><p class="noscript">此工作台需要启用 JavaScript 才能读取本机数据。</p></noscript>
+<script type="module" src="/launch.js"></script>
+</body>
+</html>

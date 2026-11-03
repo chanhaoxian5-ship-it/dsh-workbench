@@ -1,0 +1,79 @@
+[
+  {
+    "name": "workbench_service_status",
+    "description": "Read actual backend health and instance identity. Does not start or stop the service.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "workbench_read",
+    "description": "GET a documented local /v1 read route, including workspace/board/history/search/receipts. No arbitrary URLs or lifecycle operations.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "maxLength": 4096
+        }
+      },
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "workbench_publish_project",
+    "description": "Reliably register/update workspace, artifact, stage, version, feedback, plan, task, record or canvas; verify receipt and exact revision. Pass the unchanged v1 envelope. refresh snapshots selected source files. This is one operation, not an atomic batch.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "enum": [
+            "workspaces",
+            "refresh",
+            "artifacts",
+            "versions",
+            "feedback",
+            "plans",
+            "tasks",
+            "records",
+            "canvases",
+            "stages"
+          ]
+        },
+        "workspace_id": {
+          "type": "string"
+        },
+        "payload": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "collection",
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "workbench_publish_discovery",
+    "description": "Reliably publish a source-grounded discovery with producer/session identity, unchanged delivery key and verification declarations. Verify durable receipt and discovery readback.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "payload": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "payload"
+      ],
+      "additionalProperties": false
+    }
+  }
+]

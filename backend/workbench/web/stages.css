@@ -1,0 +1,325 @@
+/* 阶段线与里程碑（v28 打磨版）
+   一条日期轴上的两条轨：左轨说“哪一段”，右轨说“冻了哪一版”，中间的扇区把它们连起来。
+   视觉上的三条硬规矩：
+   1. 一个阶段一个低饱和色相，阶段点、连线、卡片边共用同一个 --tone，归属靠颜色也读得出；
+      聚光（11-03 评审后）：阶段色只留在连线上——线会交叉，归属只能靠颜色读；卡片、阶段点、主干、版本号一律中性，当前位置用墨色；
+   2. 同一个数字只写一遍——日期在抬头和卡片副行，版本号在卡片，进度只在“正在走”的那一块；
+   3. 退让只压一层（.dim 的子元素乘一次），绝不两层相乘。
+   只在 stages.css 里改，不动 app.css；旧版同名选择器由下面覆盖。 */
+
+/* ---------- 抬头：读数 + 回到当前 ---------- */
+.stage-board { padding: 16px 20px 14px; gap: 12px; }
+.board-head { display: flex; align-items: center; gap: 10px 14px; flex-wrap: wrap; }
+.board-head h2 { display: none; align-items: center; gap: 7px; margin: 0; font-size: 14.5px; font-weight: 650; letter-spacing: -.2px; color: var(--ink); }
+.board-icon { display: inline-grid; place-items: center; flex: none; }
+.board-head h2 .board-icon svg { width: 16px; height: 16px; color: var(--accent); }
+
+/* 读数：现在是哪一段、走到第几天。整块画布只在这里写一次“位置”。
+   用等宽数字锁住宽度，滚动读数不会因为数字位数变化而跳动。 */
+.board-meta { display: inline-flex; align-items: center; gap: 10px; margin-left: 2px; min-height: 24px; }
+.meta-now { display: inline-flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; color: var(--ink2); white-space: nowrap; }
+.meta-count b { font-style: normal; font-weight: 700; font-size: 13px; color: var(--ink2); font-variant-numeric: tabular-nums; }
+.meta-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--ink); box-shadow: 0 0 0 3px var(--sunk); }
+.board-meta.all-done .meta-dot { background: var(--faint); box-shadow: none; }
+.meta-count { display: inline-flex; align-items: baseline; gap: 2px; padding-left: 10px; border-left: 1px solid var(--line); font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+
+/* 图例：三枚样本就是画布里的三种线，颜色按阶段渐着，说明“线按阶段取色”。 */
+.board-legend { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.board-legend .legend-item { display: inline-flex; align-items: center; gap: 7px; font-size: 12px; color: var(--muted); }
+.board-legend .legend-item i { flex: none; display: block; width: 22px; height: 0; border-top: 2px solid #4A6587; border-radius: 2px; }
+.board-legend .legend-item i.legend-link { border-top: 1.4px dashed #2F6B66; opacity: .85; }
+.board-legend .legend-item i.strong { border-top-width: 2px; border-top-style: solid; border-top-color: #4A6587; background: linear-gradient(90deg, #4A6587, #2F6B66 42%, #7A5B2E 72%, #7B4F6B); height: 2px; border: 0; }
+.board-legend .legend-item i.legend-dot { width: 11px; height: 11px; border: 0; border-radius: 50%; height: 11px; background: linear-gradient(135deg, #4A6587 20%, #7B4F6B); box-shadow: 0 0 0 2px #fff inset; }
+
+/* “回到当前”贴着读数放：它是读数的动词，不是页面级按钮。 */
+.board-jump {
+  display: inline-flex; align-items: center; gap: 6px; flex: none; margin-left: auto;
+  height: 30px; padding: 0 11px 0 9px; border: 1px solid var(--line); border-radius: 8px;
+  background: var(--paper); color: var(--ink2); font-size: 12.5px; font-weight: 600; cursor: pointer;
+  transition: border-color var(--t-base) var(--ease), color var(--t-base) var(--ease),
+              background-color var(--t-base) var(--ease), transform var(--t-fast) var(--ease);
+}
+.board-jump .board-icon svg { width: 15px; height: 15px; }
+.board-jump:hover { border-color: var(--accent); color: var(--accent); }
+.board-jump:active { background-color: var(--accent-wash); transform: scale(.985); }
+.board-jump:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ---------- 画布 ---------- */
+.board-viewport {
+  position: relative; height: 700px; overflow: hidden; cursor: grab; touch-action: none;
+  display: grid; grid-template-columns: minmax(186px, 25%) minmax(84px, 14%) minmax(0, 1fr);
+  /* 外层已是一张纸：画布不再描第二道框（一屏最多两层盒子）。 */
+  border: 0; border-radius: var(--r-md);
+  background: linear-gradient(180deg, var(--paper), #FAFAF8);
+}
+.board-viewport::before, .board-viewport::after { content: ''; display: block; position: absolute; left: 0; right: 0; z-index: 3; pointer-events: none; }
+.board-viewport::before { top: 0; height: 22px; background: linear-gradient(to bottom, var(--paper), transparent); }
+.board-viewport::after { bottom: 0; height: 26px; background: linear-gradient(to top, #FAFAF8, transparent); }
+.board-viewport.dragging { cursor: grabbing; }
+.board-viewport:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* 边界状态：顶住了就亮一条 2px 内阴影，把「滚不动」变成「到头了」。
+   内阴影不会改变布局，也不和新加的软边界超冲打架；reduced-motion 下同样出现，
+   因为这里传达的是信息，不是装饰。 */
+.board-viewport::before, .board-viewport::after { transition: box-shadow var(--t-fast) var(--ease); }
+.board-viewport.edge-top { box-shadow: inset 0 2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+.board-viewport.edge-bottom { box-shadow: inset 0 -2px 0 0 color-mix(in srgb, var(--accent) 55%, transparent); }
+.board-viewport.edge-top::before { background: linear-gradient(to bottom, color-mix(in srgb, var(--accent) 6%, #fff), transparent); }
+.board-viewport.edge-bottom::after { background: linear-gradient(to top, color-mix(in srgb, var(--accent) 6%, #FAFAF8), transparent); }
+
+.lane { position: relative; top: auto; bottom: auto; left: auto; right: auto; width: auto; height: 100%; overflow: hidden; z-index: 1; }
+.stage-lane { grid-column: 1; }
+.milestone-lane { grid-column: 3; }
+.lane-inner { position: absolute; top: 0; left: 0; right: 0; will-change: transform; backface-visibility: hidden; }
+
+/* 连线层只覆盖两轨之间那片扇区，并且跟着左轨一起平移。 */
+.link-layer { display: block; position: absolute; top: 0; z-index: 0; pointer-events: none; contain: layout style paint; will-change: transform; }
+.link-svg { display: block; width: 100%; height: 100%; overflow: visible; }
+
+/* 线按阶段取色：--tone 由脚本写在每条 path 上。
+   阶段版本是这条线的正式交付，实线带箭头；阶段内留档是同一段里的工作副本，细虚线不含箭头。 */
+/* 每一条都必须自己写 stroke：app.css 里还有更早的 .version-link.strong 规则，
+   少了这一行，实线会退回那支灰蓝色，颜色就不再代表归属。 */
+.version-link { fill: none; stroke: var(--tone, #8C9AAE); stroke-width: 1.4; stroke-dasharray: 3 4; stroke-linecap: round; opacity: .62; transition: opacity 160ms, stroke-width 160ms; }
+.version-link.strong { stroke: var(--tone, #8C9AAE); stroke-width: 2; stroke-dasharray: none; stroke-linecap: butt; opacity: .95; }
+.version-link.planned { stroke: var(--tone, #8C9AAE); stroke-dasharray: 2 5; opacity: .5; }
+.version-link.planned.strong { stroke: var(--tone, #8C9AAE); stroke-dasharray: 6 5; opacity: .65; }
+.version-link.lit { stroke: var(--tone, #8C9AAE); }
+.version-link.dim { opacity: .1; }
+.version-link.lit { stroke-width: 3; opacity: 1; }
+
+/* 「今天」横线放在各自轨道里，跟着自己的轨道滚动；两轨错位时会短暂分开。 */
+.now-line { position: absolute; left: 0; right: 0; height: 0; border-top: 1.5px solid color-mix(in srgb, var(--ink) 50%, transparent); pointer-events: none; z-index: 0; }
+/* “今天”这条线只写一遍名字：两轨平时对齐，在右轨再标一次是同一个日期说了两遍。
+   右轨保留线的位置，靠左轨那枚标签说明它是什么。 */
+.now-line span { position: absolute; top: -9px; left: 2px; z-index: 3; padding: 0 6px; border-radius: 4px; background: var(--ink); color: #fff; font-size: 11.5px; font-weight: 600; line-height: 18px; letter-spacing: .2px; }
+.milestone-lane .now-line span { display: none; }
+
+/* ---------- 阶段：一段一块牌子 ---------- */
+.stage-item {
+  position: absolute; left: 0; right: 8px; top: 0; padding: 9px 12px 10px 14px; border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  text-align: right; cursor: pointer;
+  transition: background .18s var(--ease), border-color .18s var(--ease), box-shadow .18s var(--ease);
+}
+.stage-item.future { background: #fff; border-style: dashed; border-color: var(--line2); }
+/* 当前阶段：白纸 + 墨色描边与抬起，和全站「当前位置用墨色」一致。 */
+.stage-item.current {
+  background: #fff;
+  border-color: var(--ink);
+  box-shadow: var(--shadow-1);
+}
+.stage-label {
+  min-width: 0; margin-left: 0; padding: 0 32px 0 0; text-align: right; cursor: pointer; border-radius: var(--r-sm);
+  transition: background-color var(--t-fast) var(--ease);
+}
+/* 阶段名也是 div + role=button，和版本卡一样缺按下反馈。
+   只在 label 上换一层更深的阶段色，不动整块牌子的描边，避免和 .lit 打架。 */
+.stage-label:active { background: var(--sunk); }
+.stage-board.stacked .stage-label:active { background: var(--sunk2); }
+.stage-item h3 { margin: 0; font-size: 14.5px; font-weight: 650; letter-spacing: -.2px; line-height: 1.45; color: var(--ink); }
+.stage-item.future h3 { color: var(--muted); font-weight: 600; }
+.stage-item.current h3 { color: var(--ink); font-weight: 700; }
+.stage-note { margin: 3px 0 0; font-size: 12px; line-height: 1.55; color: var(--muted); text-wrap: pretty; }
+.stage-item h3 { text-wrap: pretty; }
+
+/* 阶段点：主干上的节点。完成=实心带勾，进行中=双环呼吸，预计=空心虚线。 */
+.stage-marker {
+  position: absolute; right: 10px; top: 10px; z-index: 1; display: grid; place-items: center;
+  width: 22px; height: 22px; border-radius: 50%;
+  background: #fff; border: 2px solid var(--line2);
+  color: var(--ink2); font-size: 11px; font-weight: 700; line-height: 1;
+}
+.stage-item.done .stage-marker { background: var(--ink2); border-color: #fff; color: #fff; box-shadow: 0 0 0 1.5px var(--line2); }
+.stage-item.current .stage-marker { background: #fff; border: 0; box-shadow: 0 0 0 2px var(--ink), 0 0 0 6px var(--sunk); }
+.stage-item.current .stage-marker::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--ink); }
+.stage-item.future .stage-marker { background: #fff; border-style: dashed; border-color: var(--line2); }
+
+/* 主干：从这一段的节点往下长到下一段；走过的段是实线，没到的是虚线。 */
+.stage-rail { position: absolute; right: 20px; top: 32px; width: 2px; border-radius: 2px; background: var(--line); }
+.stage-item.done .stage-rail { background: var(--ink2); opacity: .45; }
+.stage-item.current .stage-rail { background: repeating-linear-gradient(to bottom, var(--line2) 0 5px, transparent 5px 10px); }
+.stage-item.future .stage-rail { background: repeating-linear-gradient(to bottom, var(--line2) 0 4px, transparent 4px 9px); }
+
+/* 联动高亮：亮的那一组靠镜头，不靠把其余压暗。
+   以前用 opacity 压退让，0.7 一层就把相邻阶段的说明压到 2.9:1——鼠标扫过时读不成句。
+   现在退让只动底色、描边和连线，文字始终是原来的墨色，扫视时谁都能读。 */
+@media (hover: hover) {
+  .stage-item.dim { background: #fff; border-color: var(--line); }
+  .version-card.milestone.dim { background: #fff; border-color: var(--line); box-shadow: none; }
+  .stage-item.dim .stage-marker { opacity: .55; }
+}
+/* 过渡只保留三条颜色属性 + 一条 transform：前者是联动高亮，后者是按下反馈。
+   时长统一走 --t-base / --t-fast，不再写孤立数值。 */
+.stage-item, .version-card.milestone {
+  transition: background-color var(--t-base) var(--ease), border-color var(--t-base) var(--ease),
+              box-shadow var(--t-base) var(--ease), transform var(--t-fast) var(--ease);
+}
+.stage-item.lit { background: var(--sunk); border-color: var(--line2); }
+.stage-item.lit h3 { color: var(--ink); }
+
+/* ---------- 版本卡 ---------- */
+.version-card.milestone {
+  position: absolute; left: 4px; right: 40px; top: 0; width: auto;
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: start; gap: 0 12px;
+  padding: 11px 13px 12px 0;
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  background: #fff;
+  cursor: pointer;
+  transition: border-color var(--t-base) var(--ease), background-color var(--t-base) var(--ease),
+              box-shadow var(--t-base) var(--ease), transform var(--t-fast) var(--ease);
+  transform-origin: 60% 50%;
+}
+@media (hover: hover) {
+  .version-card.milestone:hover { border-color: var(--line2); box-shadow: var(--shadow-1); }
+}
+.version-card.milestone.planned {
+  border-style: dashed; background: #fff;
+}
+.version-card.milestone.current { border-color: var(--ink); box-shadow: var(--shadow-1); }
+/* 阶段版本是该阶段正式交出的那一版：更深一层的阶段色底，压在普通留档之上。 */
+.version-card.milestone.stage-version { background: #FAFAF8; border-color: var(--line2); }
+.version-card.milestone.lit { border-color: var(--line2); box-shadow: var(--shadow-1); }
+/* 展开的那一刻卡是「原地长高」的，此时再压一下会把新长出来的部分一起缩掉，
+   所以只在收起态给按压缩放。 */
+.version-card.milestone.expanded:active { transform: none; }
+.version-card.milestone:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+/* 按下反馈：卡片是 div + role=button，拿不到 app.css 里 <button> 的那条 scale，
+   在这里单独补一次。只压 0.985，和 app.css 的 button:active(.97) 比更轻——
+   这张卡很大，同样的比例压下去会比小按钮重得多。 */
+.version-card.milestone:active { transform: scale(.985); box-shadow: none; }
+.version-card.milestone:active .milestone-summary { color: var(--ink); }
+
+/* 版本号是这张卡的脸：等宽数字 + 小号 v，扫下来时量级自己会说话。
+   号码单独落在左边一列，正文因此永远从同一条竖向基线开始。 */
+.version-card.milestone .version-number {
+  grid-column: 1; grid-row: 1 / span 2; align-self: start;
+  display: inline-flex; align-items: baseline; gap: 1px; min-width: 46px; padding: 2px 10px 2px 12px;
+  font-size: 15px; font-weight: 700; letter-spacing: -.3px; color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+.version-card.milestone .version-number .vn-prefix { font-size: 10.5px; font-weight: 600; opacity: .72; letter-spacing: 0; }
+.version-card.milestone.stage-version .version-number { font-size: 19px; letter-spacing: -.6px; }
+.version-card.milestone.planned .version-number { color: var(--muted); }
+
+.version-card.milestone .milestone-head { grid-column: 2; display: flex; align-items: center; gap: 4px 10px; flex-wrap: wrap; padding-top: 1px; }
+.version-card.milestone .milestone-name { font-size: 13.5px; font-weight: 650; letter-spacing: -.2px; color: var(--ink); }
+.version-card.milestone .chip { align-self: center; }
+
+/* 副行：存档时间 + 文件数。日期是“什么时候冻的”，不是用来扫的量，缩到一行里。 */
+.version-card.milestone .milestone-sub { grid-column: 2; display: flex; align-items: center; gap: 6px; margin-top: 3px; font-size: 12px; color: var(--muted); }
+.version-card.milestone .version-date { font-variant-numeric: tabular-nums; }
+/* 阶段版本与段内留档的差别只落在两个已有元素上：底色深浅、版本号字号。
+   不再另加一条左侧色条——描边已经按阶段取色，再描一遍是同一种说法写第二遍。 */
+.version-card.milestone .milestone-sub-sep { color: var(--muted); font-size: 11px; }
+.version-card.milestone .milestone-summary { grid-column: 2; margin: 7px 0 0; font-size: 13px; line-height: 1.65; color: var(--ink2); }
+
+.version-card.milestone .milestone-chevron {
+  grid-column: 3; grid-row: 1; align-self: center; margin-top: 2px;
+  width: 7px; height: 7px; border-right: 1.6px solid var(--faint); border-bottom: 1.6px solid var(--faint);
+  transform: rotate(45deg); transition: transform .22s var(--ease);
+}
+.version-card.milestone.expanded .milestone-chevron { transform: rotate(225deg); margin-top: 4px; }
+.version-card.milestone .milestone-detail { grid-column: 2 / span 2; }
+
+/* 展开体：0fr → 1fr 的网格行高过渡，内容是「就地生长」而不是 display 瞬变。
+   外层只负责这一行的高度，内层 min-height:0 + overflow:hidden 负责裁切，
+   于是收起时高度真的会收到 0，而不是留下内容的高度把卡片撑住。 */
+.version-card.milestone .milestone-detail {
+  display: grid; grid-template-rows: 0fr;
+  margin-top: 0; padding-top: 0; border-top-width: 0;
+  transition: grid-template-rows var(--t-enter) var(--ease), margin-top var(--t-enter) var(--ease),
+              padding-top var(--t-enter) var(--ease), border-top-width var(--t-enter) var(--ease);
+}
+.version-card.milestone.expanded .milestone-detail {
+  grid-template-rows: 1fr;
+  margin-top: 10px; padding-top: 10px; border-top-width: 1px;
+}
+.version-card.milestone .milestone-detail-body { min-height: 0; overflow: hidden; }
+/* 收起后里面那几条链接不该还能被 Tab 到：高度虽然是 0，元素还在。 */
+
+/* 卡上只剩一枚标记：这一版是不是该阶段正式交出的那一版。
+   “所属阶段”不再挂：卡片贴着阶段线、连线按阶段着色，第三遍说同一件事只是噪音。 */
+.stage-board .chip { display: inline-flex; align-items: center; gap: 4px; padding: 1px 7px; border-radius: 5px; font-size: 12px; line-height: 1.7; font-weight: 500; white-space: nowrap; background: var(--wash); color: var(--muted); }
+.stage-board .chip.flag { background: transparent; box-shadow: inset 0 0 0 1px var(--line2); color: var(--ink2); font-weight: 550; }
+.version-card.milestone .chip.flag { margin-left: 2px; }
+
+/* ---------- 单列：≤700px（由脚本切换 .stage-board.stacked） ---------- */
+.stage-board .board-viewport.stacked { display: block; height: auto; overflow: visible; cursor: auto; touch-action: auto; }
+.stage-board .board-viewport.stacked::before, .stage-board .board-viewport.stacked::after { display: none; }
+.stage-board.stacked .stacked-list { display: grid; gap: 14px; padding: 14px 16px; }
+.stage-board.stacked .stacked-list .stage-item {
+  position: relative; left: auto; right: auto; top: auto; display: block; padding: 0; overflow: hidden;
+  text-align: left; border: 1px solid var(--line); border-radius: 12px;
+  background: #fff; cursor: default;
+}
+.stage-board.stacked .stacked-list .stage-item.current { border-color: var(--ink); }
+.stage-board.stacked .stacked-list .stage-item.future { background: #fff; border-style: dashed; }
+.stage-board.stacked .stage-label {
+  margin: 0; padding: 12px 14px 10px 38px; text-align: left; cursor: pointer;
+  background: #fff; border-radius: 11px 11px 0 0;
+}
+.stage-board.stacked .stage-label:focus-visible { outline-offset: -3px; }
+.stage-board.stacked .stage-item.lit .stage-label { background: var(--sunk); }
+.stage-board.stacked .stage-item h3 { font-size: 15.5px; }
+.stage-board.stacked .stacked-list .stage-marker { left: 13px; right: auto; top: 14px; }
+.stage-board.stacked .stacked-list .stage-rail { display: none; }
+.stage-board.stacked .stacked-milestones { display: grid; gap: 0; margin: 0; padding: 0 0 4px; }
+/* 手机：版本是阶段卡里的一行，只用发丝线分隔，不再套第三层框。 */
+.stage-board.stacked .version-card.milestone { position: relative; left: auto; right: auto; top: 0; width: auto; border: 0; border-top: 1px solid var(--line); border-radius: 0; background: none; box-shadow: none; }
+.stage-board.stacked .version-card.milestone.stage-version { background: none; }
+.stage-board.stacked .version-card.milestone.stage-version .version-number { font-size: 17px; }
+.stage-board.stacked .version-card.milestone .milestone-chevron { grid-column: 3; }
+
+.stacked-now { display: flex; align-items: center; gap: 10px; margin: 0 2px; }
+.stacked-now span { flex: none; padding: 0 9px; border-radius: 999px; background: var(--ink); color: #fff; font-size: 12px; line-height: 22px; font-weight: 600; }
+.stacked-now::after { content: ""; flex: 1; border-top: 1px dashed var(--line2); }
+.stage-board.stacked .version-empty { margin: 0; padding: 6px 2px; font-size: 12.5px; color: var(--faint); }
+.stage-board.stacked .milestone-detail { border-top-color: var(--line); }
+
+/* 701–900px：两条轨还并排，但左轨收窄、扇区收窄，版本卡的宽度优先留给内容。 */
+@media (min-width: 701px) and (max-width: 900px) {
+  .board-viewport { grid-template-columns: minmax(148px, 21%) minmax(56px, 9%) minmax(0, 1fr); }
+  .board-head { gap: 8px 12px; }
+  .stage-item { padding-left: 10px; padding-right: 8px; }
+  .stage-item .stage-label { padding-right: 30px; }
+  .stage-item h3 { font-size: 14px; }
+  .version-card.milestone { padding: 10px 11px 11px 0; grid-template-columns: auto minmax(0, 1fr) auto; gap: 0 9px; }
+  .version-card.milestone.stage-version .version-number { font-size: 17px; }
+  .version-card.milestone .version-number { min-width: 40px; padding: 1px 8px 1px 10px; }
+  .stage-board .chip { font-size: 11.5px; padding: 0 6px; }
+  .meta-count { display: none; }
+}
+
+@media (max-width: 700px) {
+  .stage-board { padding: 14px 12px 12px; }
+  /* 手机上一行只放一件事：抬头先读位置，再给动作，最后一行说明线型。 */
+  .board-head { display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-template-areas: 'meta jump'; gap: 8px 10px; }
+  /* 页面工具栏已经写着“项目进展”，这里不再重复标题。 */
+  .board-head h2 { display: none; }
+  .board-meta { grid-area: meta; margin-left: 0; min-height: 30px; }
+  .board-jump { grid-area: jump; margin-left: 0; height: 30px; }
+  .board-legend { grid-area: legend; gap: 12px; padding-top: 2px; }
+  .board-legend .legend-item { font-size: 11.5px; }
+  /* 单列里没有连线：再摆一份“实线 / 虚线”的说明，是在解释看不见的东西。 */
+  .stage-board.stacked .board-legend { display: none; }
+  .stage-board.stacked .stacked-list { padding: 4px 0 0; gap: 12px; }
+  .stage-board.stacked .stage-label { padding: 11px 12px 9px 40px; }
+  .stage-board.stacked .stacked-list .stage-marker { left: 11px; width: 20px; height: 20px; top: 13px; font-size: 10px; }
+  .stage-board.stacked .stage-item h3 { font-size: 15px; }
+  .stage-board.stacked .stacked-milestones { padding: 0 0 4px; gap: 0; }
+  .version-card.milestone { padding: 10px 10px 11px 0; gap: 0 9px; }
+  .version-card.milestone .version-number { min-width: 40px; padding: 1px 8px 1px 10px; }
+  .version-card.milestone .milestone-head { gap: 3px 7px; }
+  .stage-board .chip { font-size: 11.5px; padding: 0 6px; }
+}
+
+/* 对比度：展开卡里的“变更记录待填写”说明，以及“预计”版本号，在浅底上都要过 4.5:1。 */
+.stage-board .change-empty-hint { color: var(--muted); }
+
+/* 动效偏好：展开/收起与高亮都不再过渡。 */
+@media (prefers-reduced-motion: reduce) {
+  .version-card.milestone, .version-link, .stage-item, .stage-item > *, .version-card.milestone > *, .milestone-chevron { transition: none; }
+}

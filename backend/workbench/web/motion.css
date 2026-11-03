@@ -1,0 +1,624 @@
+/*
+ * Workbench 交互反馈动效样式。配合 motion.js 使用。
+ * 颜色与时长集中在 :root，改配色只需改这里；motion.js 会读取这些变量作为等待时长。
+ * 动画主要用 transform / opacity。例外（均为低频或必要场景）：展开用 grid 行高过渡，
+ * 移除条目补间 height，分段指示条补间 width，遮罩补间 background-color。
+ */
+:root {
+  --wb-accent: #2f52c9;
+  --wb-accent-soft: rgba(47, 82, 201, 0.14);
+  --wb-attention: #8a5a12;
+  --wb-success: #1f7a4d;
+  --wb-danger: #b3261e;
+  --wb-ink: #1f2733;
+  --wb-muted: #5b6675;
+  --wb-line: #c9d1de;
+  --wb-paper: #ffffff;
+  --wb-toast-success: #6ec89a;
+  --wb-toast-attention: #e0b357;
+  --wb-toast-danger: #ef8a84;
+
+  --wb-fast: 150ms;
+  --wb-base: 220ms;
+  --wb-slow: 300ms;
+  --wb-flash: 1200ms;
+  --wb-view-out-dur: 110ms;
+  --wb-view-in-dur: 240ms;
+  --wb-toast-dur: 380ms;
+  --wb-ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --wb-ease-in: cubic-bezier(0.4, 0, 1, 1);
+  /* 弹性曲线：带过冲，产生 pop 感 */
+  --wb-ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --wb-ease-soft-spring: cubic-bezier(0.3, 1.25, 0.5, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --wb-fast: 1ms;
+    --wb-base: 1ms;
+    --wb-slow: 1ms;
+    --wb-flash: 1ms;
+  }
+  .wb-spinner {
+    animation: none;
+  }
+  .wb-skeleton {
+    animation: none;
+  }
+  .wb-burst-layer {
+    display: none;
+  }
+  /* 兜底：所有 CSS 动画与过渡都压到 1ms 且只播一次，不依赖各组件逐条覆盖 */
+  *,
+  *::before,
+  *::after {
+    animation-delay: 0s !important;
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-delay: 0s !important;
+    transition-duration: 1ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+@keyframes wb-pop-in {
+  0% { opacity: 0; transform: translateY(10px) scale(0.85); }
+  60% { opacity: 1; transform: translateY(-2px) scale(1.04); }
+  100% { opacity: 1; transform: none; }
+}
+@keyframes wb-bounce {
+  0% { transform: scale(0.4); }
+  55% { transform: scale(1.25); }
+  75% { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+@keyframes wb-bounce-dot {
+  0% { transform: scale(0.4); }
+  55% { transform: scale(1.3); }
+  75% { transform: scale(1.1); }
+  100% { transform: scale(1.15); }
+}
+@keyframes wb-toast-pop {
+  0% { transform: translate(-50%, 8px) scale(0.9); }
+  55% { transform: translate(-50%, 0) scale(1.04); }
+  100% { transform: translate(-50%, 0) scale(1); }
+}
+@keyframes wb-backdrop-in {
+  from { background-color: rgba(31, 39, 51, 0); }
+  to { background-color: rgba(31, 39, 51, 0.4); }
+}
+@keyframes wb-backdrop-out {
+  from { background-color: rgba(31, 39, 51, 0.4); }
+  to { background-color: rgba(31, 39, 51, 0); }
+}
+@keyframes wb-jelly {
+  0%, 100% { transform: scale(1, 1); }
+  25% { transform: scale(0.92, 1.08); }
+  50% { transform: scale(1.06, 0.94); }
+  75% { transform: scale(0.98, 1.02); }
+}
+@keyframes wb-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes wb-fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes wb-rise {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wb-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes wb-pulse {
+  0%, 100% { opacity: 0.45; }
+  50% { opacity: 1; }
+}
+@keyframes wb-flash-fade {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes wb-dialog-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wb-dialog-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateY(6px) scale(0.98); }
+}
+/* 保存失败：短促的左右抖动，衰减收尾（"zzz"） */
+@keyframes wb-shake {
+  0%, 100% { transform: translateX(0); }
+  15% { transform: translateX(-6px); }
+  30% { transform: translateX(6px); }
+  45% { transform: translateX(-4px); }
+  60% { transform: translateX(4px); }
+  75% { transform: translateX(-2px); }
+  90% { transform: translateX(2px); }
+}
+@keyframes wb-panel-in {
+  from { opacity: 0; transform: translateX(24px); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes wb-panel-out {
+  from { opacity: 1; transform: none; }
+  to { opacity: 0; transform: translateX(24px); }
+}
+
+/* 1. 视图切换：左右滑动（--wb-dx 由 swapView 按方向设置） */
+@keyframes wb-slide-in {
+  from { opacity: 0; transform: translateX(var(--wb-dx, 36px)); }
+  60% { opacity: 1; }
+  to { opacity: 1; transform: none; }
+}
+.wb-view-out {
+  opacity: 0;
+  transform: translateX(calc(var(--wb-dx, 36px) * -1));
+  transition:
+    transform var(--wb-view-out-dur) cubic-bezier(0.4, 0, 1, 1),
+    opacity var(--wb-view-out-dur) cubic-bezier(0.4, 0, 1, 1);
+}
+.wb-view-in {
+  animation: wb-slide-in var(--wb-view-in-dur) cubic-bezier(0.2, 0.9, 0.25, 1);
+}
+
+/* 2. 展开 / 收起：<div data-wb-expand><div class="wb-expand-inner">…</div></div> */
+[data-wb-expand] {
+  display: grid;
+  grid-template-rows: 0fr;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    grid-template-rows 320ms var(--wb-ease-soft-spring),
+    opacity var(--wb-base) var(--wb-ease-out),
+    visibility 0s linear 320ms;
+}
+[data-wb-expand][data-open="true"] {
+  grid-template-rows: 1fr;
+  opacity: 1;
+  visibility: visible;
+  transition-delay: 0s;
+}
+.wb-expand-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+.wb-chevron {
+  transition: transform var(--wb-slow) var(--wb-ease-spring);
+}
+[aria-expanded="true"] .wb-chevron {
+  transform: rotate(180deg);
+}
+
+/* 3. 新条目出现与强调 */
+.wb-enter {
+  animation: wb-pop-in 420ms var(--wb-ease-spring);
+}
+.wb-flash {
+  position: relative;
+}
+.wb-flash::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--wb-accent-soft);
+  pointer-events: none;
+  animation: wb-flash-fade var(--wb-flash) var(--wb-ease-out) forwards;
+}
+
+/* 4. 保存按钮：<button class="wb-save"><span class="wb-save-icon"></span><span class="wb-save-text">保存</span></button> */
+.wb-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--wb-accent);
+  border-radius: 8px;
+  background: var(--wb-accent);
+  color: #fff;
+  font: inherit;
+  cursor: pointer;
+  transition: background-color var(--wb-base) var(--wb-ease-out), border-color var(--wb-base) var(--wb-ease-out);
+}
+.wb-save:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 2px;
+}
+.wb-save-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  flex: none;
+  font-weight: 700;
+  line-height: 1;
+}
+.wb-save-icon:empty {
+  display: none;
+}
+.wb-save[data-wb-state="pending"] {
+  cursor: progress;
+  opacity: 0.88;
+}
+.wb-save[data-wb-state="pending"] .wb-save-icon {
+  display: inline-block;
+  border: 2px solid #fff;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: wb-spin 800ms linear infinite;
+}
+.wb-save[data-wb-state="success"] {
+  background: var(--wb-success);
+  border-color: var(--wb-success);
+  animation: wb-jelly 520ms ease-out;
+}
+.wb-save[data-wb-state="success"] .wb-save-icon {
+  display: inline-block;
+  position: relative;
+  animation: wb-bounce 480ms var(--wb-ease-spring);
+}
+.wb-save[data-wb-state="success"] .wb-save-icon::after {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 5px;
+  height: 10px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+.wb-save[data-wb-state="error"] {
+  background: var(--wb-danger);
+  border-color: var(--wb-danger);
+  animation: wb-shake 420ms ease-out;
+}
+.wb-save[data-wb-state="error"] .wb-save-icon {
+  border: 2px solid #fff;
+  border-radius: 50%;
+  font-size: 11px;
+  line-height: 1; /* 与默认图标一致，保证 "!" 在圆圈中居中 */
+}
+
+/* 5. 阶段进度：<ol class="wb-stages"><li class="wb-stage"><span class="wb-stage-dot"></span><span>初稿</span></li>…</ol> */
+.wb-stages {
+  display: flex;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wb-stage {
+  position: relative;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  color: var(--wb-muted);
+  font-size: 14px;
+  transition: color var(--wb-base) var(--wb-ease-out);
+}
+.wb-stage + .wb-stage::before {
+  content: "";
+  position: absolute;
+  top: 7px;
+  right: 50%;
+  width: 100%;
+  height: 2px;
+  background: var(--wb-line);
+  transition: background-color var(--wb-base) var(--wb-ease-out);
+}
+.wb-stage-dot {
+  position: relative;
+  z-index: 1;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--wb-line);
+  border-radius: 50%;
+  background: var(--wb-paper);
+  transition:
+    background-color var(--wb-base) var(--wb-ease-out),
+    border-color var(--wb-base) var(--wb-ease-out),
+    transform var(--wb-base) var(--wb-ease-out);
+}
+.wb-stage[data-state="done"]::before,
+.wb-stage[data-state="current"]::before {
+  background: var(--wb-accent);
+}
+.wb-stage[data-state="done"] .wb-stage-dot {
+  background: var(--wb-accent);
+  border-color: var(--wb-accent);
+}
+.wb-stage[data-state="current"] {
+  color: var(--wb-ink);
+  font-weight: 600;
+}
+.wb-stage[data-state="current"] .wb-stage-dot {
+  border-color: var(--wb-accent);
+  transform: scale(1.15);
+  box-shadow: 0 0 0 4px var(--wb-accent-soft);
+  /* 动画终点与静止态的 scale(1.15) 一致，结束时不跳变 */
+  animation: wb-bounce-dot 560ms var(--wb-ease-spring);
+}
+
+/* 6. 任务完成：<li class="wb-task" data-done="false"><button role="checkbox" class="wb-task-check">…</button><span class="wb-task-title">…</span></li> */
+.wb-task {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.wb-task-check {
+  position: relative;
+  width: 24px;
+  height: 24px;
+  flex: none;
+  padding: 0;
+  border: 1.5px solid var(--wb-line);
+  border-radius: 7px;
+  background: var(--wb-paper);
+  cursor: pointer;
+  transition: background-color var(--wb-base) var(--wb-ease-out), border-color var(--wb-base) var(--wb-ease-out);
+}
+.wb-task-check:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: 2px;
+}
+.wb-task-check::after {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 3px;
+  width: 6px;
+  height: 11px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg) scale(0);
+  transition: transform var(--wb-base) var(--wb-ease-out);
+}
+.wb-task[data-done="true"] .wb-task-check {
+  background: var(--wb-accent);
+  border-color: var(--wb-accent);
+}
+.wb-task[data-done="true"] .wb-task-check::after {
+  transform: rotate(45deg) scale(1);
+  transition-timing-function: var(--wb-ease-spring);
+}
+.wb-task[data-done="true"] .wb-task-check {
+  animation: wb-jelly 520ms ease-out;
+}
+.wb-task-title {
+  position: relative;
+  color: var(--wb-ink);
+  transition: color var(--wb-base) var(--wb-ease-out);
+}
+.wb-task-title::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  height: 1.5px;
+  background: currentColor;
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform var(--wb-slow) var(--wb-ease-out);
+}
+.wb-task[data-done="true"] .wb-task-title {
+  color: var(--wb-muted);
+}
+.wb-task[data-done="true"] .wb-task-title::after {
+  transform: scaleX(1);
+}
+
+/* 7. 弹窗与侧面板：<dialog class="wb-dialog"> / <dialog class="wb-panel"> */
+.wb-dialog,
+.wb-panel {
+  padding: 0;
+  border: 1px solid var(--wb-line);
+  background: var(--wb-paper);
+  color: var(--wb-ink);
+}
+.wb-dialog {
+  width: min(480px, calc(100vw - 32px));
+  border-radius: 12px;
+}
+.wb-panel {
+  width: min(420px, 100vw);
+  height: 100vh; /* 旧浏览器回退 */
+  height: 100dvh;
+  max-height: 100vh;
+  max-height: 100dvh;
+  margin: 0 0 0 auto;
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+}
+.wb-dialog[open] {
+  animation: wb-dialog-in 360ms var(--wb-ease-spring);
+}
+.wb-panel[open] {
+  animation: wb-panel-in 360ms var(--wb-ease-spring);
+}
+/* 遮罩：用 keyframes 从透明渐入到半透明。不依赖 @starting-style（旧浏览器不支持，
+ * 会直接跳到深色），也不依赖 transition（首次显示时没有起始值，同样不会渐变）。 */
+.wb-dialog[open]::backdrop,
+.wb-panel[open]::backdrop {
+  background-color: rgba(31, 39, 51, 0.4);
+  animation: wb-backdrop-in var(--wb-base) var(--wb-ease-out) both;
+}
+.wb-dialog[data-wb-closing] {
+  animation: wb-dialog-out var(--wb-fast) var(--wb-ease-in) forwards;
+}
+.wb-panel[data-wb-closing] {
+  animation: wb-panel-out var(--wb-fast) var(--wb-ease-in) forwards;
+}
+.wb-dialog[data-wb-closing]::backdrop,
+.wb-panel[data-wb-closing]::backdrop {
+  background-color: rgba(31, 39, 51, 0);
+  animation: wb-backdrop-out var(--wb-fast) var(--wb-ease-in) forwards;
+}
+
+/* 8. 延迟加载提示：把 hidden 的 [data-wb-loading] 放进区域内 */
+.wb-spinner {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: wb-spin 800ms linear infinite;
+}
+.wb-skeleton {
+  height: 12px;
+  border-radius: 6px;
+  background: var(--wb-line);
+  animation: wb-pulse 1.4s ease-in-out infinite;
+}
+[data-wb-loading][hidden] {
+  display: none;
+}
+[aria-busy="true"] > .wb-content {
+  opacity: 0.55;
+  transition: opacity var(--wb-base) var(--wb-ease-out);
+}
+
+/* 9. 提示条：由 toast() 自动创建，也可以直接放一个 .wb-toast */
+.wb-toast {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: min(420px, calc(100vw - 32px));
+  padding: 10px 14px;
+  border-radius: 8px;
+  background: #1f2733;
+  color: #fff;
+  font-size: 14px;
+  line-height: 1.4;
+  box-shadow: 0 8px 24px rgba(31, 39, 51, 0.22);
+  opacity: 0;
+  transform: translate(-50%, 8px);
+  transition:
+    opacity var(--wb-fast) var(--wb-ease-out),
+    transform var(--wb-toast-dur) var(--wb-ease-spring);
+  pointer-events: none;
+}
+.wb-toast[hidden] {
+  display: none;
+}
+.wb-toast[data-open="true"] {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+/* 成功提示的弹跳单独用带 translate(-50%) 的关键帧，避免覆盖居中定位 */
+.wb-toast.wb-toast-pop {
+  animation: wb-toast-pop 480ms var(--wb-ease-spring);
+}
+.wb-toast::before {
+  content: "";
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--wb-toast-tone, var(--wb-accent));
+}
+.wb-toast[data-tone="success"] {
+  --wb-toast-tone: var(--wb-toast-success);
+}
+.wb-toast[data-tone="attention"] {
+  --wb-toast-tone: var(--wb-toast-attention);
+}
+.wb-toast[data-tone="danger"] {
+  --wb-toast-tone: var(--wb-toast-danger);
+}
+
+/* 10. 分段切换：<div class="wb-tabs" role="tablist"><span class="wb-tab-indicator"></span><button class="wb-tab" role="tab">…</button></div> */
+.wb-tabs {
+  position: relative;
+  display: inline-flex;
+  padding: 4px;
+  border: 1px solid var(--wb-line);
+  border-radius: 10px;
+  background: #f4f6fa;
+}
+.wb-tab-indicator {
+  position: absolute;
+  top: 4px;
+  bottom: 4px;
+  left: 0;
+  width: 0;
+  border-radius: 7px;
+  background: var(--wb-paper);
+  box-shadow: 0 1px 3px rgba(31, 39, 51, 0.14);
+  transition:
+    transform 340ms var(--wb-ease-spring),
+    width 340ms var(--wb-ease-spring);
+}
+
+.wb-bounce-once {
+  animation: wb-bounce 520ms var(--wb-ease-spring);
+}
+
+/* 12. 粒子迸发：motion.js 的 burst() 在 .wb-burst-layer 内生成 .wb-particle */
+.wb-burst-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 70;
+  overflow: hidden;
+  pointer-events: none;
+}
+.wb-particle {
+  position: fixed;
+  left: 0;
+  top: 0;
+  border-radius: 50%;
+  will-change: transform, opacity;
+}
+.wb-tab {
+  position: relative;
+  z-index: 1;
+  min-height: 40px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--wb-muted);
+  font: inherit;
+  font-size: 14px;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--wb-fast) var(--wb-ease-out);
+}
+.wb-tab[aria-selected="true"] {
+  color: var(--wb-ink);
+  font-weight: 600;
+}
+.wb-tab:focus-visible {
+  outline: 2px solid var(--wb-accent);
+  outline-offset: -2px;
+}
+.wb-tabpanel {
+  margin-top: 12px;
+  color: var(--wb-muted);
+  font-size: 14px;
+}
+.wb-tabpanel[hidden] {
+  display: none;
+}
+
+/* 11. 骨架屏：<div data-wb-skeleton hidden><div class="wb-skeleton">…</div></div> */
+[data-wb-skeleton][hidden] {
+  display: none;
+}
+.wb-skeleton-stack {
+  display: grid;
+  gap: 8px;
+}
