@@ -3,6 +3,11 @@
   "backend_schema": 3,
   "http_schema": 1,
   "files": {
+    "assets/icon-dark.png": "01dfef28e1582e0ba42c165034e54341d10705be2e0a12fea057be3441800652",
+    "assets/icon-dark.svg": "5b64f12e36b9a2f4272869d3322c8164cf15ec0efd047d6accd88ea3385810aa",
+    "assets/icon.png": "e5197bb8657934b1494adf86fb7f862e17c3b5e45d5d56b9e5aec005b16a272f",
+    "assets/icon.svg": "88de8c88fe3f23078df7cc61bc2e394eb381b5db28ebefece798c76f183de3fb",
+    "assets/README.md": "f17baccf08e465ceb74b930f22ef8c6e7bcf123d40cbb684e101bbc0ed4b788c",
     "backend/workbench/__init__.py": "0ef69beefc9016fe34e197315541da6f2908d9a46e26b1b4734ce42496254f27",
     "backend/workbench/agent.py": "5d04f7385cf4a33480a86458ce96e25a4e6179c117e7e8866a15e3ee51bc8e7c",
     "backend/workbench/changes.py": "37a4e4207e1909ed6350255a2ac1cec2240da7f400db7e9405c1979f4b624331",
@@ -16,6 +21,7 @@
     "backend/workbench/project_publish.py": "6b853b2c28b7cc3cc2984dbf016e9bd2e3bba1cba279c33562de33fea6bd220a",
     "backend/workbench/projects.py": "437ecc3c68e6540d328bf3e5b682ea6e56d497fac37230569fe8f3ecfd9aedab",
     "backend/workbench/publish.py": "234c0b367d6a4d76c85cda0588c8ba28629fd142aee21a1ca4dcfb81817d68df",
+    "backend/workbench/README.md": "1aea9da29f809ccc9353311defcb063e6109565685b4ee09c344bab2867f3be7",
     "backend/workbench/server.py": "7faffe9b37085a6522f3d864f96cb58784e5967672dd19679971eeea0ac0a6fc",
     "backend/workbench/store.py": "78200d40b95b960741d07b53f0c87606ea7498fb8336d0095ac9a46259f547f4",
     "backend/workbench/web/app.css": "c51b01ca94c3399657576137cf9ee5a4ff5244e77ba15199baf3d045f8243d92",
@@ -62,6 +68,7 @@
     "backend/workbench/web/motion.css": "ffba9c9480b0eea898f0821ca972fc4d31458fdc444f18df9768468ad21d0ba3",
     "backend/workbench/web/motion.js": "d0d1c22b9b00a4ea2625f486efc49f529408787148b5972048346a08f2077b78",
     "backend/workbench/web/projects.js": "41125e602e5afaab5d68a4d8d1f26110557012e02c64ac48639bbedf18a4c78d",
+    "backend/workbench/web/README.md": "16d8627d834edf84bd6720dbf5fd021159d710282bf28610bd5259d9060b7053",
     "backend/workbench/web/stages.css": "a3631aa1329860fd9e05b4eb185d55ce6e00092f5dd563d0152cf467c2bad0a0",
     "backend/workbench/web/stages.js": "9e92edc71a724ac7a951ce10ce6dd70595937101ec0e612ad1e2f0adefcc05fb",
     "lib/client.js": "85e6c9e978afef80d0b11cbf4613dd84a72ad396738d3fa7a8e608448e863a36",
@@ -69,9 +76,14 @@
     "lib/host.mjs": "5a7538860b63a662f0fd02d11e560aedefb66c739bfb72e98c1ff2538ee1737f",
     "lib/index.mjs": "578a3e11364807ea03bc1e3f82566e04ceb8928e4507228385a384889e5ed630",
     "lib/launch.js": "b3d28a2de9a32634050871eb125f9791c3afb9fe286b25659e4675aa0c2c93a9",
+    "lib/README.md": "257022e22d50010bde2d39f38d640b465d5a0d991790a36768991eae9c22d04b",
     "lib/tools.json": "6b437d162584237bafee4862e672ac62d8810960ed3f2c09ebbdd241ea3db9df",
+    "locale/en.json": "6365627beac06f8f3dd75b91c4cfdae9505f03f25f82c383a79723ed7cb583ad",
+    "locale/README.md": "5442f9a832399cc3fd0126de509a1d7acc2dfb48369c7dcd2cb6cc1e9603dd6b",
+    "locale/zh.json": "9f54403b55007fe2a1d35810d3faf0811397bc1ec0ba2a82fed6839ca1dcccbe",
     "python/workbench/agent.py": "5d04f7385cf4a33480a86458ce96e25a4e6179c117e7e8866a15e3ee51bc8e7c",
     "python/workbench/managed.py": "a874a6d895d8ea1711e35146e0f3a972aecc46651c52b2cbf9e50f34265131f6",
-    "python/workbench/mcp.py": "5f4dc37b1a60b75a5d205ce27786b4574456eeef1d08e7de247ddcbbf521ea22"
+    "python/workbench/mcp.py": "5f4dc37b1a60b75a5d205ce27786b4574456eeef1d08e7de247ddcbbf521ea22",
+    "python/workbench/README.md": "e07bbe9678330c5d37340e3497d5823cf084aba3b73d761469135f8f5581a115"
   }
 }
