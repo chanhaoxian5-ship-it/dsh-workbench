@@ -1,0 +1,6 @@
+{
+  "meta": {
+    "title": "Workbench",
+    "description": "A local Agent workbench for project files, versions and work records, with a bundled UI/backend, service controls in Settings and shared MCP access."
+  }
+}

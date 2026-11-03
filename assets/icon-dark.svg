@@ -1,0 +1,13 @@
+﻿<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024" role="img" aria-label="Workbench">
+  <title>Workbench</title>
+  <defs>
+    <style>
+      :root { --bg:#242B36; --ink:#EAF0FA; --accent:#2F52C9; --attention:#F0B04A; }
+    </style>
+  </defs>
+  <rect width="1024" height="1024" rx="228" fill="#242B36"/>
+  <path d="M232 800H792" stroke="#EAF0FA" stroke-opacity="0.22" stroke-width="12" stroke-linecap="round"/>
+  <path d="M232 332L372 692L512 452L652 692L792 332" fill="none" stroke="#EAF0FA" stroke-width="72" stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="512" cy="452" r="30" fill="#2F52C9"/>
+  <circle cx="808" cy="224" r="28" fill="#F0B04A"/>
+</svg>
